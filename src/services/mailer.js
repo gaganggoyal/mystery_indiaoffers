@@ -25,7 +25,7 @@ function getTransporter() {
 const redactTokens = body =>
   config.isProd ? String(body || '').replace(/([?&]t=)[A-Za-z0-9]+/g, '$1REDACTED') : body;
 
-async function sendMail({ to, subject, text, html, attachments }) {
+async function sendMail({ to, subject, text, html, attachments, replyTo }) {
   const t = getTransporter();
   if (!t) {
     console.log(
@@ -40,7 +40,18 @@ async function sendMail({ to, subject, text, html, attachments }) {
     );
     return { logged: true };
   }
-  return t.sendMail({ from: config.mail.from, to, subject, text, html, attachments });
+  return t.sendMail({
+    from: config.mail.from,
+    // Client mail is usually sent from a noreply@ address for deliverability,
+    // but the copy actively asks people to reply (a corrected UTR, a changed
+    // SKU). Route those to the monitored support inbox instead of a black hole.
+    replyTo: replyTo || config.mail.replyTo,
+    to,
+    subject,
+    text,
+    html,
+    attachments
+  });
 }
 
 module.exports = { sendMail };
