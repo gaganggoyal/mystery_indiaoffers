@@ -11,10 +11,16 @@
     </p>
   </div>
 
-  <% if (paidFlash) { %><div class="form-ok">✓ Payment recorded. Your mystery shop is in the queue.</div><% } %>
+  <% if (paidFlash) { %><div class="form-ok">✓ Payment confirmed. Your mystery shop is in the queue.</div><% } %>
+  <% if (submittedFlash) { %>
+    <div class="form-ok">
+      ✓ Payment details received. We're matching them against our bank statement —
+      you'll get an email as soon as it's confirmed (usually a few working hours).
+    </div>
+  <% } %>
 
   <%
-    const steps = ['pending_payment','paid','in_progress','completed'];
+    const steps = ['pending_payment','payment_review','paid','in_progress','completed'];
     const idx = steps.indexOf(order.status);
   %>
   <div class="timeline">

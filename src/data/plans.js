@@ -307,13 +307,25 @@ const SCORE_PILLARS = [
   { key: 'returns', label: 'Returns & refunds', max: 10 }
 ];
 
+/**
+ * Order lifecycle.
+ *
+ * `payment_review` exists because payment is self-reported: the client types a
+ * UTR / uploads a screenshot, which is a *claim* that money was sent, not proof.
+ * Nothing may reach `paid` — the state that tells a shopper to start spending
+ * the product budget — until a human matches it against the bank statement.
+ */
 const ORDER_STATUSES = [
   { id: 'pending_payment', label: 'Awaiting payment', color: '#f59e0b' },
+  { id: 'payment_review', label: 'Verifying payment', color: '#d97706' },
   { id: 'paid', label: 'Paid — in queue', color: '#0ea5e9' },
   { id: 'in_progress', label: 'Shop in progress', color: '#6366f1' },
   { id: 'completed', label: 'Report ready', color: '#059669' },
   { id: 'cancelled', label: 'Cancelled', color: '#94a3b8' }
 ];
+
+/** Statuses where the client has done their part and we owe them work. */
+const ACTIVE_STATUSES = ['payment_review', 'paid', 'in_progress'];
 
 function getPlan(id) {
   return PLANS.find(p => p.id === String(id || '').toLowerCase()) || null;
@@ -334,6 +346,7 @@ module.exports = {
   CUSTOM_RETURN_ADDON,
   SCORE_PILLARS,
   ORDER_STATUSES,
+  ACTIVE_STATUSES,
   getPlan,
   formatInr,
   statusMeta

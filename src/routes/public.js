@@ -7,7 +7,7 @@ const fs = require('fs');
 const multer = require('multer');
 const db = require('../db');
 const config = require('../config');
-const { sendMail } = require('../services/mailer');
+const notify = require('../services/notifications');
 const { bookingLimiter, payLimiter, trackLimiter } = require('../middleware/rate-limit');
 const {
   PLANS, COST_POLICY, SCORE_PILLARS, CUSTOM_RETURN_ADDON,
@@ -304,18 +304,13 @@ router.post('/book', bookingLimiter, async (req, res, next) => {
       ]
     );
 
-    const totalDue = serviceFee + productDeposit;
-    const payUrl = `${config.siteUrl}/pay/${code}?t=${token}`;
-    await sendMail({
-      to: client_email,
-      subject: `Order ${code} — pay to start your IndiaOffers mystery shop`,
-      text: `Hi ${client_name},\n\nOrder ${code} (${plan.name})\nService fee: ${formatInr(serviceFee)}\nProduct deposit: ${formatInr(productDeposit)}\nTotal due: ${formatInr(totalDue)}\n\nPay: ${payUrl}\n\n— IndiaOffers E-Mystery`
-    }).catch(() => {});
-    await sendMail({
-      to: config.support.email,
-      subject: `[E-Mystery] New ${code} ${plan.name} total ${formatInr(totalDue)}`,
-      text: `${client_name} <${client_email}>\n${brand_url}\nService ${formatInr(serviceFee)} + deposit ${formatInr(productDeposit)}\n${payUrl}`
-    }).catch(() => {});
+    await notify.orderCreated(
+      {
+        id, order_code: code, access_token: token, plan_name: plan.name,
+        client_name, client_email, brand_url
+      },
+      { serviceFee, productDeposit }
+    );
 
     res.redirect(`/pay/${code}?t=${token}`);
   } catch (err) { next(err); }
@@ -363,12 +358,14 @@ router.post('/pay/:code', payLimiter, (req, res) => {
 
       const totalDue = (order.price_inr || 0) + (order.product_deposit_inr || 0);
 
+      // Dev-only shortcut. Skips verification precisely because it is fake
+      // money; config.js refuses to boot production while this is enabled.
       if (method === 'test' && config.testPayEnabled) {
         await db.query(
           `UPDATE mystery_orders SET status='paid', payment_method='test', payment_ref=?, paid_at=?, amount_paid=?, updated_at=? WHERE id=?`,
           ['TEST-' + Date.now().toString(36), db.nowSql(), totalDue, db.nowSql(), order.id]
         );
-        await notifyPaid(order);
+        await notify.paymentConfirmed(order);
         return res.redirect(`/order/${order.order_code}?t=${order.access_token}&paid=1`);
       }
 
@@ -376,12 +373,17 @@ router.post('/pay/:code', payLimiter, (req, res) => {
         return res.redirect(`/pay/${order.order_code}?t=${order.access_token}&err=` + encodeURIComponent('Enter UTR/UPI ref or upload screenshot'));
       }
 
+      // A typed UTR is a *claim*, not proof — anyone can invent one. Park the
+      // order in payment_review; only an admin who matched it against the bank
+      // statement may move it to 'paid'. amount_paid and paid_at stay null
+      // until then so revenue reporting never counts unverified money.
       await db.query(
-        `UPDATE mystery_orders SET status='paid', payment_method=?, payment_ref=?, payment_proof=?, paid_at=?, amount_paid=?, updated_at=? WHERE id=?`,
-        [method === 'bank' ? 'bank' : 'upi', ref || null, proof, db.nowSql(), totalDue, db.nowSql(), order.id]
+        `UPDATE mystery_orders SET status='payment_review', payment_method=?, payment_ref=?, payment_proof=?,
+           payment_claimed_at=?, updated_at=? WHERE id=?`,
+        [method === 'bank' ? 'bank' : 'upi', ref || null, proof, db.nowSql(), db.nowSql(), order.id]
       );
-      await notifyPaid(order);
-      res.redirect(`/order/${order.order_code}?t=${order.access_token}&paid=1`);
+      await notify.paymentClaimed(order, { ref, proof, method });
+      res.redirect(`/order/${order.order_code}?t=${order.access_token}&submitted=1`);
     } catch (e) {
       console.error(e);
       res.redirect(`/pay/${req.params.code}?t=${req.query.t || ''}&err=Server+error`);
@@ -389,19 +391,6 @@ router.post('/pay/:code', payLimiter, (req, res) => {
   });
 });
 
-async function notifyPaid(order) {
-  const total = (order.price_inr || 0) + (order.product_deposit_inr || 0);
-  await sendMail({
-    to: order.client_email,
-    subject: `Payment received — ${order.order_code} started`,
-    text: `Hi ${order.client_name},\n\nPayment for ${order.order_code} received (total ${formatInr(total)}).\nService ${formatInr(order.price_inr)} + product deposit ${formatInr(order.product_deposit_inr || 0)}.\nOur shopper will begin shortly.\nTrack: ${config.siteUrl}/order/${order.order_code}?t=${order.access_token}\n\n— IndiaOffers E-Mystery`
-  }).catch(() => {});
-  await sendMail({
-    to: config.support.email,
-    subject: `[E-Mystery] PAID ${order.order_code}`,
-    text: `${order.plan_name}\nService ${formatInr(order.price_inr)} + deposit ${formatInr(order.product_deposit_inr || 0)} = ${formatInr(total)}\n${order.brand_url}`
-  }).catch(() => {});
-}
 
 router.get('/order/:code', async (req, res, next) => {
   try {
@@ -415,7 +404,8 @@ router.get('/order/:code', async (req, res, next) => {
       plan: getPlan(order.plan_id),
       report,
       competitors: parseJson(order.competitor_urls, []),
-      paidFlash: req.query.paid === '1'
+      paidFlash: req.query.paid === '1',
+      submittedFlash: req.query.submitted === '1'
     }));
   } catch (err) { next(err); }
 });

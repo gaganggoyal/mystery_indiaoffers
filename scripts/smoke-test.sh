@@ -69,10 +69,30 @@ else
   CODE=""; TOK=""
 fi
 
+head_ "Payment verification (a typed UTR must not mean 'paid')"
+if [[ -n "$CODE" ]]; then
+  curl -sS -o /dev/null -X POST "$BASE/pay/$CODE?t=$TOK" \
+    -d "t=$TOK" -d 'payment_method=upi' -d 'payment_ref=000000000000' 2>/dev/null
+  PAGE=$(curl -sS "$BASE/order/$CODE?t=$TOK" 2>/dev/null)
+  if grep -qi 'Verifying payment\|matching them against our bank' <<<"$PAGE"; then
+    ok "self-reported payment goes to review, not paid"
+  else
+    bad "self-reported payment did NOT land in review — check the order state machine"
+  fi
+  grep -qi 'in the queue' <<<"$PAGE" && bad "order was queued for shopping without verification" \
+                                    || ok "order not queued until an admin confirms"
+fi
+
+# Grab a CSRF cookie + token up front; admin POSTs are rejected without one.
+LOGIN_HTML=$(curl -sS -c "$JAR" "$BASE/admin/login" 2>/dev/null)
+CSRF=$(grep -o 'name="_csrf" value="[a-f0-9]*"' <<<"$LOGIN_HTML" | head -1 | sed 's/.*value="//;s/"//')
+
 head_ "Access control"
 check "GET /admin redirects to login" 302 /admin
-check "admin login rejects bad password" 401 /admin/login -X POST -d 'email=admin@localhost' -d 'password=definitely-wrong'
+check "admin login rejects bad password" 401 /admin/login -X POST -b "$JAR" \
+  -d 'email=admin@localhost' -d 'password=definitely-wrong' -d "_csrf=$CSRF"
 check "payment proofs not publicly served" 404 /uploads/pay-test.jpg
+check "admin proof route requires auth" 302 /admin/proof/pay-test.jpg
 if [[ -n "$CODE" ]]; then
   check "track with wrong email" 200 /track -X POST -d "order_code=$CODE" -d 'email=attacker@evil.com'
 fi
@@ -87,13 +107,38 @@ if [[ "$BASE" == https://* ]]; then
   grep -qi '^strict-transport-security:' <<<"$HDRS" && ok "HSTS present" || bad "HSTS missing on https"
 fi
 
+head_ "CSRF"
+if [[ -n "$CSRF" ]]; then
+  ok "login form carries a CSRF token"
+  ST=$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST "$BASE/admin/login" \
+    --data-urlencode "email=${ADMIN_EMAIL:-admin@localhost}" -d 'password=x' 2>/dev/null)
+  [[ "$ST" == "403" ]] && ok "POST without CSRF token rejected (403)" \
+                       || bad "POST without CSRF token was accepted (got $ST)"
+else
+  bad "no CSRF token found in the login form"
+fi
+
 if [[ -n "${ADMIN_EMAIL:-}" && -n "${ADMIN_PASSWORD:-}" ]]; then
   head_ "Admin panel"
-  ST=$(curl -sS -o /dev/null -w '%{http_code}' -c "$JAR" -X POST "$BASE/admin/login" \
-    --data-urlencode "email=$ADMIN_EMAIL" --data-urlencode "password=$ADMIN_PASSWORD" 2>/dev/null)
+  ST=$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST "$BASE/admin/login" \
+    --data-urlencode "email=$ADMIN_EMAIL" --data-urlencode "password=$ADMIN_PASSWORD" \
+    -d "_csrf=$CSRF" 2>/dev/null)
   if [[ "$ST" == "302" ]]; then
     ok "admin login succeeded"
     for p in /admin /admin/orders; do check "GET $p (authed)" 200 "$p" -b "$JAR"; done
+    # Traversal must be checked while authenticated, otherwise auth's redirect
+    # masks whether the route itself is safe.
+    check "proof route rejects path traversal" 404 '/admin/proof/..%2f..%2f.env' -b "$JAR"
+    check "proof route rejects non-proof names" 404 '/admin/proof/schema.sql' -b "$JAR"
+    if [[ -n "$CODE" ]]; then
+      OID=$(curl -sS -b "$JAR" "$BASE/admin/orders" 2>/dev/null | grep -oE 'ms_[a-z0-9]+' | head -1)
+      if [[ -n "$OID" ]]; then
+        DETAIL=$(curl -sS -b "$JAR" "$BASE/admin/orders/$OID" 2>/dev/null)
+        grep -qi 'Confirm payment received' <<<"$DETAIL" \
+          && ok "admin sees an explicit payment-confirmation step" \
+          || bad "admin order page has no payment-confirmation control"
+      fi
+    fi
   else
     bad "admin login failed (got $ST)"
   fi

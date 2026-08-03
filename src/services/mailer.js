@@ -18,10 +18,17 @@ function getTransporter() {
   return transporter;
 }
 
+// Order links in email bodies carry a live access token. The no-SMTP fallback
+// writes bodies to the console/journal, so strip tokens there — in production a
+// missing SMTP_HOST must not turn the system log into a store of working
+// credentials. Dev keeps them so links stay clickable from the terminal.
+const redactTokens = body =>
+  config.isProd ? String(body || '').replace(/([?&]t=)[A-Za-z0-9]+/g, '$1REDACTED') : body;
+
 async function sendMail({ to, subject, text, html }) {
   const t = getTransporter();
   if (!t) {
-    console.log('\n[mail:log]', { to, subject, text: (text || '').slice(0, 400) }, '\n');
+    console.log('\n[mail:log]', { to, subject, text: redactTokens(text).slice(0, 400) }, '\n');
     return { logged: true };
   }
   return t.sendMail({ from: config.mail.from, to, subject, text, html });

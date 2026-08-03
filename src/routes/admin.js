@@ -5,9 +5,14 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const config = require('../config');
-const { sendMail } = require('../services/mailer');
+const notify = require('../services/notifications');
 const { adminAuth, signAdmin, cookieOpts } = require('../middleware/auth');
 const { loginLimiter } = require('../middleware/rate-limit');
+const { csrfToken, csrfProtect } = require('../middleware/csrf');
+
+// Every admin route issues a token; every admin POST must present it back.
+router.use(csrfToken);
+router.use(csrfProtect);
 const { PLANS, SCORE_PILLARS, ORDER_STATUSES, getPlan, formatInr, statusMeta } = require('../data/plans');
 
 function parseJson(s, f) {
@@ -18,9 +23,17 @@ router.get('/login', (req, res) => {
   res.render('admin/login', { title: 'Admin Login', error: null, config });
 });
 
+// A bcrypt hash of a value nobody can supply. Compared against when the email
+// doesn't exist so both branches burn the same ~100ms — otherwise response
+// timing reveals which admin emails are real.
+const DUMMY_HASH = bcrypt.hashSync('invalid-account-placeholder', 10);
+
 router.post('/login', loginLimiter, async (req, res) => {
   const rows = await db.query('SELECT * FROM admins WHERE email = ?', [req.body.email || '']);
-  if (!rows.length || !(await bcrypt.compare(req.body.password || '', rows[0].password_hash))) {
+  const hash = rows.length ? rows[0].password_hash : DUMMY_HASH;
+  const passwordOk = await bcrypt.compare(req.body.password || '', hash);
+  if (!rows.length || !passwordOk) {
+    console.warn('[admin] failed login for %s from %s', req.body.email || '(none)', req.ip);
     return res.status(401).render('admin/login', { title: 'Admin Login', error: 'Invalid credentials', config });
   }
   await db.query('UPDATE admins SET last_login = ? WHERE id = ?', [db.nowSql(), rows[0].id]);
@@ -91,7 +104,10 @@ router.get('/orders/:id', async (req, res, next) => {
       fixes: parseJson(report && report.top_fixes, []),
       pillars: SCORE_PILLARS, ORDER_STATUSES, statusMeta, formatInr, PLANS, config,
       saved: req.query.saved === '1',
-      published: req.query.published === '1'
+      published: req.query.published === '1',
+      confirmed: req.query.confirmed === '1',
+      rejected: req.query.rejected === '1',
+      err: req.query.err || null
     });
   } catch (err) { next(err); }
 });
@@ -103,11 +119,59 @@ router.post('/orders/:id', async (req, res, next) => {
     const order = rows[0];
     const action = req.body.action || 'save_order';
 
+    // Money confirmation is deliberately its own action, not a status dropdown
+    // change: it is the point where we accept that cash actually arrived and
+    // authorise a shopper to start spending the product budget.
+    if (action === 'confirm_payment') {
+      if (!['pending_payment', 'payment_review'].includes(order.status)) {
+        return res.redirect(`/admin/orders/${order.id}`);
+      }
+      const total = (order.price_inr || 0) + (order.product_deposit_inr || 0);
+      const received = parseInt(req.body.amount_received, 10);
+      await db.query(
+        `UPDATE mystery_orders SET status='paid', paid_at=COALESCE(paid_at, ?), amount_paid=?,
+           payment_verified_by=?, payment_ref=COALESCE(NULLIF(?, ''), payment_ref), updated_at=? WHERE id=?`,
+        [
+          db.nowSql(),
+          Number.isNaN(received) ? total : Math.max(0, received),
+          req.admin.email,
+          String(req.body.payment_ref || '').trim(),
+          db.nowSql(),
+          order.id
+        ]
+      );
+      const fresh = (await db.query('SELECT * FROM mystery_orders WHERE id = ?', [order.id]))[0];
+      await notify.paymentConfirmed(fresh);
+      return res.redirect(`/admin/orders/${order.id}?confirmed=1`);
+    }
+
+    if (action === 'reject_payment') {
+      if (order.status !== 'payment_review') return res.redirect(`/admin/orders/${order.id}`);
+      const reason = String(req.body.reject_reason || '').trim().slice(0, 500);
+      await db.query(
+        `UPDATE mystery_orders SET status='pending_payment', payment_claimed_at=NULL,
+           admin_notes=TRIM(COALESCE(admin_notes,'') || ?), updated_at=? WHERE id=?`,
+        [`\n[${db.nowSql()}] Payment claim rejected by ${req.admin.email}${reason ? ': ' + reason : ''}`, db.nowSql(), order.id]
+      );
+      await notify.paymentRejected(order, reason);
+      return res.redirect(`/admin/orders/${order.id}?rejected=1`);
+    }
+
     if (action === 'save_order') {
+      // Reaching 'paid' must go through confirm_payment so we always record who
+      // verified the money and how much actually landed. Silently ignoring the
+      // dropdown here would be confusing, so bounce with an explanation.
+      let status = String(req.body.status || order.status);
+      const unpaid = ['pending_payment', 'payment_review'].includes(order.status);
+      if (status === 'paid' && unpaid) {
+        return res.redirect(`/admin/orders/${order.id}?err=confirm_payment`);
+      }
+      if (!ORDER_STATUSES.some(s => s.id === status)) status = order.status;
+
       await db.query(
         `UPDATE mystery_orders SET status=?, assigned_to=?, admin_notes=?, eta_date=?, payment_ref=?, updated_at=? WHERE id=?`,
         [
-          String(req.body.status || order.status),
+          status,
           String(req.body.assigned_to || '').trim() || null,
           String(req.body.admin_notes || '').trim() || null,
           String(req.body.eta_date || '').trim() || null,
@@ -115,12 +179,6 @@ router.post('/orders/:id', async (req, res, next) => {
           db.nowSql(), order.id
         ]
       );
-      if (req.body.status === 'paid' && order.status === 'pending_payment') {
-        await db.query(
-          'UPDATE mystery_orders SET paid_at = COALESCE(paid_at, ?), amount_paid = COALESCE(amount_paid, ?) WHERE id = ?',
-          [db.nowSql(), order.price_inr, order.id]
-        );
-      }
       return res.redirect(`/admin/orders/${order.id}?saved=1`);
     }
 

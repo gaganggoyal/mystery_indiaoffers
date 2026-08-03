@@ -101,13 +101,16 @@ enabled. If systemd reports a failed start, run
 
 ---
 
-## Deploy to a VPS
+## Deploy to `mystery.indiaoffers.in`
 
 **DNS:** `A` record `mystery` → your server IP (zone: `indiaoffers.in`).
 
 ### 1. Server prep
 
 ```bash
+# better-sqlite3 needs a toolchain if no prebuilt binary matches your platform
+sudo apt update && sudo apt install -y nodejs npm nginx python3 g++ make sqlite3
+
 sudo useradd --system --home /var/www/indiaoffers-emystery --shell /usr/sbin/nologin emystery
 sudo mkdir -p /var/www/indiaoffers-emystery
 sudo chown emystery:emystery /var/www/indiaoffers-emystery
@@ -121,28 +124,25 @@ sudo -u emystery npm ci --omit=dev
 ### 2. Configure
 
 ```bash
-sudo -u emystery cp .env.example .env
-sudo -u emystery nano .env
-sudo chmod 600 .env          # contains secrets
+sudo -u emystery ./scripts/setup-production.sh
 ```
 
-Set at minimum:
+This creates `.env` from [`deploy/production.env.example`](deploy/production.env.example)
+already pointed at `https://mystery.indiaoffers.in`, generates a `JWT_SECRET`,
+moves any publicly-exposed payment proofs out of the static directory, and
+lists what you still need to fill in — the real `MYSTERY_UPI_ID` and `SMTP_*`.
 
-```ini
-NODE_ENV=production
-SITE_URL=https://mystery.indiaoffers.in
-SITE_HOST=mystery.indiaoffers.in
-JWT_SECRET=<openssl rand -hex 32>
-MYSTERY_TEST_PAY=0
-MYSTERY_UPI_ID=<your real UPI id>
-SMTP_HOST=…                  # otherwise customers get no email
+```bash
+sudo -u emystery nano .env
 ```
 
 ### 3. First admin
 
 ```bash
-sudo -u emystery ADMIN_EMAIL=you@indiaoffers.in ADMIN_PASSWORD='…' npm run seed
+sudo -u emystery npm run admin create you@indiaoffers.in
 ```
+
+`npm run admin` also does `list`, `passwd <email>` and `delete <email>`.
 
 ### 4. Service + TLS
 
@@ -217,25 +217,61 @@ data/                     # SQLite DB, uploads, backups (all gitignored)
 | `npm run dev` | Nodemon on port 3100 |
 | `npm start` | Production server |
 | `npm run seed` | Create the first admin |
-| `npm test` | End-to-end smoke test |
+| `npm run admin` | `list` / `create` / `passwd` / `delete` admin accounts |
+| `npm test` | End-to-end smoke test (43 checks) |
+| `npm run setup:production` | First-run VPS setup for mystery.indiaoffers.in |
+| `npm run migrate:uploads` | Move legacy payment proofs out of `public/` |
+| `npm run backup` | Consistent DB + uploads backup |
 | `scripts/deploy.sh` | Pull + restart + health check, with rollback |
-| `scripts/backup-db.sh` | Consistent DB + uploads backup |
+
+---
+
+## How payment works
+
+Payment is **self-reported** — the client types a UTR or uploads a screenshot.
+That is a claim, not proof, so orders do not go straight to `paid`:
+
+```
+pending_payment  →  payment_review  →  paid  →  in_progress  →  completed
+   client pays      client submitted    admin matched it     shopper works
+                    UTR / screenshot    to the statement
+```
+
+`paid` is the state that authorises a shopper to start spending the product
+budget, so only an admin can set it, via **Confirm payment received** on the
+order page. That action records who verified it and how much actually landed;
+`amount_paid` and `paid_at` stay null until then, so revenue reporting never
+counts money that hasn't arrived.
+
+If a claim doesn't match the statement, **Reject claim** returns the order to
+`pending_payment`, emails the client, and writes an audit note.
+
+Each claim emails support with subject `[E-Mystery] VERIFY PAYMENT <code>` —
+treat that inbox as your work queue.
 
 ---
 
 ## Security notes
 
+- **Money** never moves state on a client's say-so — see
+  [How payment works](#how-payment-works).
 - **Payment proofs** (bank/UPI screenshots) are stored in `data/uploads/`,
   outside the static root, and served only via `/admin/proof/:file` behind
   admin auth. They are never publicly reachable.
 - **Order pages** require a 36-char random token; there is no listing endpoint.
+- **Access tokens are redacted** from app logs, nginx logs, and the no-SMTP
+  mail fallback, so a log file never becomes a set of working credentials.
 - **Rate limits:** admin login 10/15 min, booking 8/hr, payment 20/hr,
   tracking 30/15 min — per IP, with a second layer in nginx.
+- **CSRF:** admin POSTs require a double-submit token on top of `SameSite=Lax`.
 - **CSP** allows self-hosted assets only; `frame-ancestors 'none'`.
+- Login uses a constant-time path for unknown emails, so response timing
+  doesn't reveal which admin accounts exist.
 - Cookies are `HttpOnly` + `SameSite=Lax` + `Secure` in production.
 - `trust proxy` is `1`, so `X-Forwarded-For` can't be spoofed past rate limits.
 - Never commit `.env`, `data/*.db`, or `data/uploads/*` — CI fails if you do.
-- Rotate `JWT_SECRET` if it is ever exposed; this logs out all admins.
+- Rotate `JWT_SECRET` to revoke every admin session immediately (deleting an
+  admin leaves their cookie valid until it expires, up to 7 days).
 
 ---
 
