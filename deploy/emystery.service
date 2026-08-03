@@ -19,6 +19,11 @@ Documentation=https://github.com/gaganggoyal/mystery_indiaoffers
 After=network-online.target
 Wants=network-online.target
 
+; Don't let a crash-loop hammer the box. These belong in [Unit] — systemd
+; ignores them (with a warning) if placed under [Service].
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
 [Service]
 Type=simple
 
@@ -42,10 +47,6 @@ KillSignal=SIGTERM
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=20
-
-; Don't let a crash-loop hammer the box.
-StartLimitIntervalSec=60
-StartLimitBurst=5
 
 ; --- Logging (view with: journalctl -u emystery -f) ------------------------
 StandardOutput=journal

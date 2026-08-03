@@ -74,17 +74,35 @@ if [[ "$missing" -gt 0 ]]; then
   echo
 fi
 
-bold "Then:"
+bold "Then — first admin and the service:"
 cat <<EOF
-  node scripts/admin.js create you@indiaoffers.in     # first admin account
-  sudo cp deploy/mystery-indiaoffers.service /etc/systemd/system/
-  sudo systemctl daemon-reload && sudo systemctl enable --now mystery-indiaoffers
-  sudo cp deploy/nginx-$DOMAIN.conf /etc/nginx/sites-available/$DOMAIN
-  sudo ln -sf /etc/nginx/sites-available/$DOMAIN /etc/nginx/sites-enabled/
-  sudo nginx -t && sudo systemctl reload nginx
-  sudo certbot --nginx -d $DOMAIN
+  node scripts/admin.js create you@indiaoffers.in
+  sudo cp deploy/emystery.service /etc/systemd/system/
+  sudo systemctl daemon-reload && sudo systemctl enable --now emystery
+  sudo ufw allow from 172.16.0.0/12 to any port 3100 proto tcp comment 'emystery app'
+EOF
 
-Verify:
+echo
+bold "Then — put it behind a reverse proxy (pick the one this box uses):"
+cat <<EOF
+  Caddy in Docker (as on the IndiaOffers VPS) — see deploy/Caddyfile.snippet:
+    append the block to the shared Caddyfile, then
+    docker exec <caddy> caddy validate --config /etc/caddy/Caddyfile
+    docker exec <caddy> caddy reload   --config /etc/caddy/Caddyfile
+
+  Standalone nginx — see deploy/nginx-$DOMAIN.conf:
+    sudo cp deploy/nginx-$DOMAIN.conf /etc/nginx/sites-available/$DOMAIN
+    sudo ln -sf /etc/nginx/sites-available/$DOMAIN /etc/nginx/sites-enabled/
+    sudo nginx -t && sudo systemctl reload nginx
+    sudo certbot --nginx -d $DOMAIN
+EOF
+
+echo
+bold "Verify:"
+cat <<EOF
   curl https://$DOMAIN/healthz
   BASE=https://$DOMAIN ./scripts/smoke-test.sh
+
+Nightly backups:
+  echo "0 2 * * * cd \$PWD && ./scripts/backup-db.sh >> \$PWD/data/backup.log 2>&1" | crontab -
 EOF
