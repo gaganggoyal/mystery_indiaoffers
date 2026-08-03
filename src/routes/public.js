@@ -307,9 +307,11 @@ router.post('/book', bookingLimiter, async (req, res, next) => {
     );
 
     const created = {
-      id, order_code: code, access_token: token, plan_name: plan.name,
+      id, order_code: code, access_token: token,
+      plan_id: plan.id, plan_name: plan.name,
       client_name, client_email, brand_url,
-      price_inr: serviceFee, product_deposit_inr: productDeposit
+      price_inr: serviceFee, product_deposit_inr: productDeposit,
+      eta_date: eta.toISOString().slice(0, 10)
     };
 
     if (config.reviewBeforePay) {

@@ -284,12 +284,7 @@ router.post('/orders/:id', async (req, res, next) => {
         [db.nowSql(), db.nowSql(), order.id]
       );
       await db.query(`UPDATE mystery_orders SET status='completed', updated_at=? WHERE id=?`, [db.nowSql(), order.id]);
-      const reportUrl = `${config.siteUrl}/report/${order.order_code}?t=${order.access_token}`;
-      await sendMail({
-        to: order.client_email,
-        subject: `Your mystery shop report is ready — ${order.order_code}`,
-        text: `Hi ${order.client_name},\n\nScore: ${reportRows[0].overall_score}/100\n${reportRows[0].verdict || ''}\n\nView: ${reportUrl}\n\n— IndiaOffers E-Mystery`
-      }).catch(() => {});
+      await notify.reportPublished(order, reportRows[0]);
       return res.redirect(`/admin/orders/${order.id}?published=1`);
     }
 
