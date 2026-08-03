@@ -49,13 +49,22 @@ check "custom without cart total"  400 /book -X POST -d 'plan_id=custom' -d 'cli
 
 head_ "Booking flow"
 # --data-urlencode: a raw "+" in a -d body is decoded back to a space.
-LOC=$(curl -sS -i -X POST "$BASE/book" \
+BOOK_RESP=$(curl -sS -i -X POST "$BASE/book" \
   -d 'plan_id=basic' --data-urlencode 'client_name=Smoke Test' \
   --data-urlencode "client_email=smoke-$(date +%s)@example.com" \
-  -d 'brand_url=https://smoke-test.example.com' -d 'accept_cost_policy=1' \
-  2>/dev/null | grep -i '^location:' | tr -d '\r' | awk '{print $2}')
+  -d 'brand_url=https://smoke-test.example.com' -d 'accept_cost_policy=1' 2>/dev/null)
+BOOK_STATUS=$(head -1 <<<"$BOOK_RESP" | awk '{print $2}')
+LOC=$(grep -i '^location:' <<<"$BOOK_RESP" | tr -d '\r' | awk '{print $2}')
 
-if [[ "$LOC" == /pay/* ]]; then
+# The booking limiter is 8/hour per IP, so a second run inside the hour is
+# throttled by design. Report that as a skip — treating it as a failure would
+# make the suite look broken every time you run it twice.
+if [[ "$BOOK_STATUS" == "429" ]]; then
+  printf '  \033[33m!\033[0m booking rate-limited (429) — the limiter is working;\n'
+  printf '    skipping order-dependent checks. Re-run in an hour, or from another IP,\n'
+  printf '    to exercise the full booking flow.\n'
+  CODE=""; TOK=""
+elif [[ "$LOC" == /pay/* ]]; then
   ok "booking created → $LOC"
   CODE="${LOC#/pay/}"; CODE="${CODE%%\?*}"
   TOK="${LOC##*t=}"
@@ -65,7 +74,7 @@ if [[ "$LOC" == /pay/* ]]; then
   check "order page with no token"    404 "/order/$CODE"
   check "report hidden before publish" 302 "/report/$CODE?t=$TOK"
 else
-  bad "booking did not redirect to /pay (got '$LOC')"
+  bad "booking did not redirect to /pay (HTTP $BOOK_STATUS, location '$LOC')"
   CODE=""; TOK=""
 fi
 
