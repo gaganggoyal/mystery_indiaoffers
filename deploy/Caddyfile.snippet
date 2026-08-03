@@ -1,0 +1,42 @@
+# ── mystery.indiaoffers.in ────────────────────────────────────────────────
+#
+# Append this block to the shared Caddyfile on the VPS:
+#   /root/cricketverse_deploy/deployment/vps/Caddyfile
+#
+# Caddy runs in Docker (container cricketverse_deploy-caddy-1) and holds :80
+# and :443 for every site on this box. 172.18.0.1 is the compose network's
+# bridge gateway — i.e. the host — which is how the sibling host-side Node apps
+# are already reached (indiaoffers.in :3000, getusers.online :3001,
+# complaint.website :3002). This app runs on :3100.
+#
+# Caddy obtains and renews the Let's Encrypt certificate automatically; the
+# only prerequisite is that mystery.indiaoffers.in resolves to this server
+# before reload.
+#
+# Apply safely — the same file serves every other site, so validate first:
+#   cp Caddyfile Caddyfile.bak.$(date +%F-%H%M)
+#   # …append this block…
+#   docker exec cricketverse_deploy-caddy-1 caddy validate --config /etc/caddy/Caddyfile
+#   docker exec cricketverse_deploy-caddy-1 caddy reload --config /etc/caddy/Caddyfile
+#
+# `caddy reload` is graceful: it swaps config without dropping connections, so
+# the other sites stay up. If validate fails, restore the .bak and reload again.
+
+mystery.indiaoffers.in {
+	encode gzip
+
+	# Payment-proof uploads are capped at 5 MB by the app; allow headroom.
+	request_body {
+		max_size 8MB
+	}
+
+	reverse_proxy 172.18.0.1:3100
+
+	# The app sets its own CSP, HSTS, X-Frame-Options and Referrer-Policy via
+	# helmet. Only -Server is added here; duplicating the others would append a
+	# second, conflicting header rather than replace the app's (the same
+	# gotcha already documented on the complaint.website block).
+	header {
+		-Server
+	}
+}

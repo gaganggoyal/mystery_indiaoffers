@@ -1,0 +1,78 @@
+; systemd unit for IndiaOffers E-Mystery — https://mystery.indiaoffers.in
+;
+;   sudo cp deploy/emystery.service /etc/systemd/system/
+;   sudo systemctl daemon-reload
+;   sudo systemctl enable --now emystery
+;   journalctl -u emystery -f
+;
+; Matches the pattern used by the sibling services on this VPS
+; (indiaoffers.service, complaint.service, getusers.service): the Node app runs
+; here on the host and Caddy — running in Docker — reverse-proxies to it over
+; the bridge gateway. See deploy/Caddyfile.snippet.
+;
+; Secrets (JWT_SECRET, SMTP_PASS, …) belong in .env, chmod 600, owned by the
+; service user — never in this file, because unit files are world-readable.
+
+[Unit]
+Description=IndiaOffers E-Mystery (mystery.indiaoffers.in) — secret shopping audits
+Documentation=https://github.com/gaganggoyal/mystery_indiaoffers
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+; --- App location & user ---------------------------------------------------
+; Unprivileged system user created with:
+;   useradd --system --home /var/www/emystery --shell /usr/sbin/nologin emystery
+User=emystery
+Group=emystery
+WorkingDirectory=/var/www/emystery
+
+; PORT, SITE_URL, JWT_SECRET, UPI and SMTP settings all live in .env (loaded by
+; dotenv). NODE_ENV=production also switches on secure cookies and the
+; fail-fast config guards in src/config.js.
+Environment=NODE_ENV=production
+Environment=PORT=3100
+ExecStart=/usr/bin/node src/server.js
+
+; --- Reliability -----------------------------------------------------------
+; server.js drains connections and checkpoints the SQLite WAL on SIGTERM.
+KillSignal=SIGTERM
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+
+; Don't let a crash-loop hammer the box.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+; --- Logging (view with: journalctl -u emystery -f) ------------------------
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=emystery
+
+; --- Hardening -------------------------------------------------------------
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+; ProtectSystem=strict makes the whole filesystem read-only, so every path the
+; app writes must be listed. SQLite DB, WAL files, payment proofs and backups
+; all live under data/.
+ReadWritePaths=/var/www/emystery/data
+
+[Install]
+WantedBy=multi-user.target
