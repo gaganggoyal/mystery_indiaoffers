@@ -226,16 +226,39 @@ data/                     # SQLite DB, uploads, backups (all gitignored)
 
 ---
 
-## How payment works
+## How an order flows
+
+```
+awaiting_review → pending_payment → payment_review → paid → in_progress → completed
+   you quote        client pays      client claims    you verify   shopper works
+```
+
+Two human checkpoints, at the two places this business can lose money.
+
+### 1. Review before quoting (`awaiting_review`)
+
+Booking takes **no payment**. The client gets an email saying you'll review the
+brief and send a payment link within 24 hours; support gets a
+`[E-Mystery] REVIEW <code>` email as the work queue.
+
+This exists because the product deposit is derived from `approx_cart` — a
+number **the client types in** — and on the Customized plan they fund 100% of
+the product. A lowballed estimate means under-collecting, and there was
+previously no point at which you could correct it.
+
+**Send payment link** on the order page is where you confirm scope, adjust the
+service fee and deposit to the real figures, and optionally add a note the
+client sees. Only then does a pay link exist. Every adjustment is written to
+the order's admin notes with who made it.
+
+To skip review and send clients straight to payment with the auto-calculated
+figures, set `MYSTERY_REVIEW_BEFORE_PAY=0`. Change the 24h promise with
+`MYSTERY_REVIEW_SLA_HOURS`.
+
+### 2. Verify before shopping (`payment_review`)
 
 Payment is **self-reported** — the client types a UTR or uploads a screenshot.
-That is a claim, not proof, so orders do not go straight to `paid`:
-
-```
-pending_payment  →  payment_review  →  paid  →  in_progress  →  completed
-   client pays      client submitted    admin matched it     shopper works
-                    UTR / screenshot    to the statement
-```
+That is a claim, not proof, so orders do not go straight to `paid`.
 
 `paid` is the state that authorises a shopper to start spending the product
 budget, so only an admin can set it, via **Confirm payment received** on the
@@ -246,8 +269,21 @@ counts money that hasn't arrived.
 If a claim doesn't match the statement, **Reject claim** returns the order to
 `pending_payment`, emails the client, and writes an audit note.
 
-Each claim emails support with subject `[E-Mystery] VERIFY PAYMENT <code>` —
-treat that inbox as your work queue.
+Each claim emails support with subject `[E-Mystery] VERIFY PAYMENT <code>`.
+Together with `[E-Mystery] REVIEW <code>` from step 1, those two subjects are
+your daily work queue.
+
+### UPI QR
+
+Once `MYSTERY_UPI_ID` is a real VPA, the payment-link email carries a QR
+encoding payee, the **exact** amount, and the order code as the transaction
+reference — so the client can't mistype any of it, and the order code shows up
+in your statement narration, which makes verification much faster. The same QR
+appears on the pay page.
+
+The QR is suppressed entirely while `MYSTERY_UPI_ID` is unset or still the
+`indiaoffers@upi` placeholder: a QR that sends money nowhere is worse than no
+QR at all.
 
 ---
 

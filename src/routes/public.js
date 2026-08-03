@@ -288,7 +288,8 @@ router.post('/book', bookingLimiter, async (req, res, next) => {
         access_token, eta_date, created_at, updated_at
       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
-        id, code, plan.id, plan.name, serviceFee, 'pending_payment',
+        id, code, plan.id, plan.name, serviceFee,
+        config.reviewBeforePay ? 'awaiting_review' : 'pending_payment',
         client_name, client_email,
         String(req.body.client_phone || '').replace(/\D/g, '').slice(0, 15) || null,
         String(req.body.client_company || '').trim().slice(0, 150) || null,
@@ -305,14 +306,20 @@ router.post('/book', bookingLimiter, async (req, res, next) => {
       ]
     );
 
-    await notify.orderCreated(
-      {
-        id, order_code: code, access_token: token, plan_name: plan.name,
-        client_name, client_email, brand_url
-      },
-      { serviceFee, productDeposit }
-    );
+    const created = {
+      id, order_code: code, access_token: token, plan_name: plan.name,
+      client_name, client_email, brand_url,
+      price_inr: serviceFee, product_deposit_inr: productDeposit
+    };
 
+    if (config.reviewBeforePay) {
+      // No amounts quoted yet — a human confirms scope and figures first, then
+      // sends the payment link from the admin panel.
+      await notify.bookingReceived(created, { serviceFee, productDeposit });
+      return res.redirect(`/order/${code}?t=${token}&received=1`);
+    }
+
+    await notify.orderCreated(created, { serviceFee, productDeposit });
     res.redirect(`/pay/${code}?t=${token}`);
   } catch (err) { next(err); }
 });
@@ -321,6 +328,8 @@ router.get('/pay/:code', async (req, res, next) => {
   try {
     const order = await loadOrderByToken(req.params.code, req.query.t);
     if (!order) return res.status(404).render('404', locals({ title: 'Order not found' }));
+    // Still under review (or already paid) — nothing to pay here yet. The
+    // order page explains where the order actually stands.
     if (order.status !== 'pending_payment') {
       return res.redirect(`/order/${order.order_code}?t=${order.access_token}`);
     }
@@ -422,7 +431,8 @@ router.get('/order/:code', async (req, res, next) => {
       report,
       competitors: parseJson(order.competitor_urls, []),
       paidFlash: req.query.paid === '1',
-      submittedFlash: req.query.submitted === '1'
+      submittedFlash: req.query.submitted === '1',
+      receivedFlash: req.query.received === '1'
     }));
   } catch (err) { next(err); }
 });

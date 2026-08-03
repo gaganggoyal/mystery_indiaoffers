@@ -59,13 +59,31 @@ LOC=$(grep -i '^location:' <<<"$BOOK_RESP" | tr -d '\r' | awk '{print $2}')
 # The booking limiter is 8/hour per IP, so a second run inside the hour is
 # throttled by design. Report that as a skip — treating it as a failure would
 # make the suite look broken every time you run it twice.
+REVIEW_FLOW=0
 if [[ "$BOOK_STATUS" == "429" ]]; then
   printf '  \033[33m!\033[0m booking rate-limited (429) — the limiter is working;\n'
   printf '    skipping order-dependent checks. Re-run in an hour, or from another IP,\n'
   printf '    to exercise the full booking flow.\n'
   CODE=""; TOK=""
+elif [[ "$LOC" == /order/* ]]; then
+  # Review-before-pay is on: booking lands on the order page, not the pay page.
+  REVIEW_FLOW=1
+  ok "booking created → $LOC (review-before-pay)"
+  CODE="${LOC#/order/}"; CODE="${CODE%%\?*}"
+  TOK="${LOC##*t=}"; TOK="${TOK%%&*}"
+  ORDERPAGE=$(curl -sS "$BASE/order/$CODE?t=$TOK" 2>/dev/null)
+  grep -qi "reviewing your brief" <<<"$ORDERPAGE" \
+    && ok "client is told their brief is under review" \
+    || bad "order page does not explain the review step"
+  grep -qi "nothing is payable yet" <<<"$ORDERPAGE" \
+    && ok "client is told nothing is payable yet" \
+    || bad "order page does not say payment isn't due yet"
+  check "pay page blocked while under review" 302 "/pay/$CODE?t=$TOK"
+  check "order page with bad token"   404 "/order/$CODE?t=deadbeef"
+  check "order page with no token"    404 "/order/$CODE"
+  check "report hidden before publish" 302 "/report/$CODE?t=$TOK"
 elif [[ "$LOC" == /pay/* ]]; then
-  ok "booking created → $LOC"
+  ok "booking created → $LOC (pay immediately)"
   CODE="${LOC#/pay/}"; CODE="${CODE%%\?*}"
   TOK="${LOC##*t=}"
   check "pay page with valid token"   200 "$LOC"
@@ -79,7 +97,10 @@ else
 fi
 
 head_ "UPI QR"
-if [[ -n "$CODE" ]]; then
+if [[ -n "$CODE" && "$REVIEW_FLOW" == "1" ]]; then
+  printf '  \033[33m!\033[0m skipped — review-before-pay is on, so the pay page (and its QR)\n'
+  printf '    only exists after an admin sends the payment link.\n'
+elif [[ -n "$CODE" ]]; then
   PAYPAGE=$(curl -sS "$BASE$LOC" 2>/dev/null)
   if grep -q 'data:image/png;base64' <<<"$PAYPAGE"; then
     ok "pay page renders an inline UPI QR"
@@ -98,7 +119,16 @@ if [[ -n "$CODE" ]]; then
 fi
 
 head_ "Payment verification (a typed UTR must not mean 'paid')"
-if [[ -n "$CODE" ]]; then
+if [[ -n "$CODE" && "$REVIEW_FLOW" == "1" ]]; then
+  # Verify the gate directly: posting a payment claim while under review must
+  # not be able to push the order forward.
+  curl -sS -o /dev/null -X POST "$BASE/pay/$CODE?t=$TOK" \
+    -d "t=$TOK" -d 'payment_method=upi' -d 'payment_ref=000000000000' 2>/dev/null
+  PAGE=$(curl -sS "$BASE/order/$CODE?t=$TOK" 2>/dev/null)
+  grep -qi 'reviewing your brief' <<<"$PAGE" \
+    && ok "payment claim on an unreviewed order is rejected" \
+    || bad "an unreviewed order moved state from a client payment claim"
+elif [[ -n "$CODE" ]]; then
   curl -sS -o /dev/null -X POST "$BASE/pay/$CODE?t=$TOK" \
     -d "t=$TOK" -d 'payment_method=upi' -d 'payment_ref=000000000000' 2>/dev/null
   PAGE=$(curl -sS "$BASE/order/$CODE?t=$TOK" 2>/dev/null)
@@ -162,9 +192,18 @@ if [[ -n "${ADMIN_EMAIL:-}" && -n "${ADMIN_PASSWORD:-}" ]]; then
       OID=$(curl -sS -b "$JAR" "$BASE/admin/orders" 2>/dev/null | grep -oE 'ms_[a-z0-9]+' | head -1)
       if [[ -n "$OID" ]]; then
         DETAIL=$(curl -sS -b "$JAR" "$BASE/admin/orders/$OID" 2>/dev/null)
-        grep -qi 'Confirm payment received' <<<"$DETAIL" \
-          && ok "admin sees an explicit payment-confirmation step" \
-          || bad "admin order page has no payment-confirmation control"
+        if [[ "$REVIEW_FLOW" == "1" ]]; then
+          grep -qi 'Send payment link' <<<"$DETAIL" \
+            && ok "admin sees the review + send-payment-link step" \
+            || bad "admin order page has no review control"
+          grep -qi 'the client typed' <<<"$DETAIL" \
+            && ok "admin is warned the deposit came from a client estimate" \
+            || bad "admin is not warned the cart estimate is client-supplied"
+        else
+          grep -qi 'Confirm payment received' <<<"$DETAIL" \
+            && ok "admin sees an explicit payment-confirmation step" \
+            || bad "admin order page has no payment-confirmation control"
+        fi
       fi
     fi
   else
