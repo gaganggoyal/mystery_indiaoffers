@@ -37,6 +37,18 @@ app.use(
     hsts: config.isProd ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false
   })
 );
+// Order/pay/report URLs carry a private access token in ?t=. Logging it verbatim
+// would put a working credential into journald and any log shipper, so redact
+// the query string before morgan ever formats the line.
+morgan.token('url', req => {
+  const url = req.originalUrl || req.url;
+  const q = url.indexOf('?');
+  if (q === -1) return url;
+  const params = new URLSearchParams(url.slice(q + 1));
+  if (params.has('t')) params.set('t', 'REDACTED');
+  const rest = params.toString();
+  return url.slice(0, q) + (rest ? '?' + rest : '');
+});
 app.use(morgan(config.isProd ? 'combined' : 'dev'));
 // Bound request bodies; nothing here legitimately posts more than a few KB.
 app.use(express.json({ limit: '100kb' }));

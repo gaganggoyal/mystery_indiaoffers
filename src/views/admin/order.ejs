@@ -2,6 +2,14 @@
 
 <% if (saved) { %><div class="form-ok">Saved.</div><% } %>
 <% if (published) { %><div class="form-ok">Report published &amp; client emailed.</div><% } %>
+<% if (confirmed) { %><div class="form-ok">Payment confirmed. Client emailed &amp; order queued for shopping.</div><% } %>
+<% if (rejected) { %><div class="form-ok">Payment claim rejected. Client emailed and order returned to “awaiting payment”.</div><% } %>
+<% if (err === 'confirm_payment') { %>
+  <div class="form-err">
+    Use <b>Confirm payment received</b> below to mark this order paid — that records who verified it
+    and how much actually landed.
+  </div>
+<% } %>
 
 <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
   <div>
@@ -30,16 +38,66 @@
       Service fee: <b><%= formatInr(order.price_inr) %></b><br>
       Product deposit: <b><%= formatInr(order.product_deposit_inr || 0) %></b><br>
       <% if (order.return_addon) { %>Return add-on: yes<br><% } %>
+      Total due: <b><%= formatInr((order.price_inr || 0) + (order.product_deposit_inr || 0)) %></b><br>
       Amount paid: <%= order.amount_paid != null ? formatInr(order.amount_paid) : '—' %><br>
       Method: <%= order.payment_method || '—' %><br>
       Ref: <%= order.payment_ref || '—' %><br>
-      Paid at: <%= order.paid_at || '—' %><br>
+      <% if (order.payment_claimed_at) { %>Client submitted: <%= order.payment_claimed_at %><br><% } %>
+      Verified: <%= order.paid_at ? order.paid_at + (order.payment_verified_by ? ' by ' + order.payment_verified_by : '') : '— not verified' %><br>
       <% if (order.payment_proof) { /* tolerate legacy "/uploads/x.jpg" rows */ %>
         <a href="/admin/proof/<%= order.payment_proof.split('/').pop() %>" target="_blank" style="color:var(--brand)">Proof ↗</a>
       <% } %>
     </p>
   </div>
 </div>
+
+<% if (order.status === 'payment_review' || order.status === 'pending_payment') { %>
+  <%
+    const totalDue = (order.price_inr || 0) + (order.product_deposit_inr || 0);
+    const claimed = order.status === 'payment_review';
+  %>
+  <div class="card" style="margin-bottom:18px;border-color:<%= claimed ? '#d97706' : 'var(--line)' %>">
+    <h3><%= claimed ? '⚠ Payment claimed — verify before shopping' : 'Record a payment' %></h3>
+    <p class="muted" style="margin-top:6px;font-size:13.5px">
+      <% if (claimed) { %>
+        The client entered these details themselves; they are <b>not</b> proof of payment.
+        Match the reference against the bank/UPI statement before confirming — confirming
+        authorises a shopper to start spending the product budget.
+      <% } else { %>
+        Use this once money lands (e.g. the client paid offline or by cheque).
+      <% } %>
+    </p>
+
+    <form method="post" action="/admin/orders/<%= order.id %>" id="confirm_payment_form" style="margin-top:12px">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="action" value="confirm_payment">
+      <div class="two">
+        <label>Amount actually received (₹)
+          <input type="number" name="amount_received" min="0" step="1" value="<%= totalDue %>">
+        </label>
+        <label>Bank / UPI reference
+          <input name="payment_ref" value="<%= order.payment_ref || '' %>" placeholder="UTR / transaction id">
+        </label>
+      </div>
+      <button class="btn-primary" type="submit" style="margin-top:12px">
+        ✓ Confirm payment received — <%= formatInr(totalDue) %>
+      </button>
+    </form>
+
+    <% if (claimed) { %>
+      <form method="post" action="/admin/orders/<%= order.id %>" id="reject_payment_form" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="action" value="reject_payment">
+        <label style="font-size:13.5px">Can't find this payment? Reason (emailed to the client)
+          <input name="reject_reason" maxlength="500" placeholder="e.g. No matching credit for this UTR">
+        </label>
+        <button class="btn-ghost btn-sm" type="submit" style="margin-top:10px;border-color:var(--bad);color:var(--bad)">
+          Reject claim &amp; ask client to re-pay
+        </button>
+      </form>
+    <% } %>
+  </div>
+<% } %>
 
 <% if (order.product_notes || order.special_brief) { %>
   <div class="card" style="margin-bottom:16px">
@@ -52,6 +110,7 @@
 <div class="card" style="margin-bottom:18px">
   <h3 style="margin-bottom:10px">Order ops</h3>
   <form method="post" action="/admin/orders/<%= order.id %>">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <input type="hidden" name="action" value="save_order">
     <div class="two">
       <label>Status
@@ -75,6 +134,7 @@
 <div class="card">
   <h3 style="margin-bottom:10px">Report scorecard</h3>
   <form method="post" action="/admin/orders/<%= order.id %>">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <input type="hidden" name="action" value="save_report">
     <label>Verdict (headline)<input name="verdict" value="<%= report && report.verdict || '' %>" placeholder="Solid product, leaky checkout trust"></label>
     <label>Executive summary<textarea name="executive_summary" rows="4"><%= report && report.executive_summary || '' %></textarea></label>
@@ -113,6 +173,7 @@
   </form>
 
   <form method="post" action="/admin/orders/<%= order.id %>" style="margin-top:12px" id="publish_form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <input type="hidden" name="action" value="publish_report">
     <button class="btn-ghost" type="submit" style="border-color:var(--good);color:var(--good)">Publish report + email client</button>
     <% if (report && report.is_published) { %>
@@ -127,6 +188,22 @@
   document.getElementById('publish_form').addEventListener('submit', function (e) {
     if (!confirm('Publish report and email it to the client?')) e.preventDefault();
   });
+
+  // Confirming payment authorises real spending — make it deliberate.
+  var confirmPay = document.getElementById('confirm_payment_form');
+  if (confirmPay) {
+    confirmPay.addEventListener('submit', function (e) {
+      if (!confirm('Have you matched this payment against the bank statement?\n\nConfirming queues the order and tells a shopper to start spending.')) {
+        e.preventDefault();
+      }
+    });
+  }
+  var rejectPay = document.getElementById('reject_payment_form');
+  if (rejectPay) {
+    rejectPay.addEventListener('submit', function (e) {
+      if (!confirm('Reject this payment claim and email the client?')) e.preventDefault();
+    });
+  }
 </script>
 
 <%- include('_layout-bottom') %>

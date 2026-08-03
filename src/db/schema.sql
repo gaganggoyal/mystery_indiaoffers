@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS mystery_orders (
   payment_method   TEXT,
   payment_ref      TEXT,
   payment_proof    TEXT,
-  paid_at          TEXT,
+  payment_claimed_at TEXT,                 -- client submitted a UTR/screenshot (unverified)
+  payment_verified_by TEXT,                -- admin who matched it to the bank statement
+  paid_at          TEXT,                   -- set ONLY on admin confirmation
+
   amount_paid      INTEGER,
   product_deposit_inr INTEGER DEFAULT 0,   -- seller-funded product cart (esp. customized plan)
   return_addon     INTEGER DEFAULT 0,      -- 1 if custom plan + return test add-on

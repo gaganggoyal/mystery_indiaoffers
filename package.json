@@ -7,8 +7,11 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "seed": "node src/db/seed.js",
+    "admin": "node scripts/admin.js",
     "test": "./scripts/smoke-test.sh",
-    "backup": "./scripts/backup-db.sh"
+    "backup": "./scripts/backup-db.sh",
+    "migrate:uploads": "node scripts/migrate-uploads.js",
+    "setup:production": "./scripts/setup-production.sh"
   },
   "repository": {
     "type": "git",

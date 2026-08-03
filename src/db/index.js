@@ -21,6 +21,8 @@ const addColumn = (table, col, ddl) => {
 };
 addColumn('mystery_orders', 'product_deposit_inr', 'product_deposit_inr INTEGER DEFAULT 0');
 addColumn('mystery_orders', 'return_addon', 'return_addon INTEGER DEFAULT 0');
+addColumn('mystery_orders', 'payment_claimed_at', 'payment_claimed_at TEXT');
+addColumn('mystery_orders', 'payment_verified_by', 'payment_verified_by TEXT');
 
 function query(sql, params = []) {
   const stmt = sqlite.prepare(sql);

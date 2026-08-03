@@ -14,6 +14,7 @@
     <a href="/admin/orders" class="<%= section === 'orders' ? 'on' : '' %>">Orders</a>
     <a href="/" target="_blank">View site ↗</a>
     <form method="post" action="/admin/logout" style="margin-top:20px">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <button class="btn-ghost btn-sm" style="width:100%;color:#fff;border-color:#334155">Logout (<%= admin.name %>)</button>
     </form>
   </aside>

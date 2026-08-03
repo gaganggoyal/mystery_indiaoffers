@@ -69,6 +69,32 @@ jobs:
           ADMIN_EMAIL: ci@example.com
           ADMIN_PASSWORD: ci-test-password-not-a-real-secret
 
+      - name: Verify a self-reported payment never reaches 'paid'
+        run: |
+          set -e
+          LOC=$(curl -sS -i -X POST http://localhost:3100/book \
+            -d 'plan_id=basic' --data-urlencode 'client_name=CI Fraud Check' \
+            --data-urlencode "client_email=ci-$(date +%s)@example.com" \
+            -d 'brand_url=https://ci.example.com' -d 'accept_cost_policy=1' \
+            | grep -i '^location:' | tr -d '\r' | awk '{print $2}')
+          CODE="${LOC#/pay/}"; CODE="${CODE%%\?*}"; TOK="${LOC##*t=}"
+          curl -sS -o /dev/null -X POST "http://localhost:3100/pay/$CODE?t=$TOK" \
+            -d "t=$TOK" -d 'payment_method=upi' -d 'payment_ref=000000000000'
+          STATUS=$(node -e "
+            const D=require('better-sqlite3');
+            const db=new D('data/emystery.db',{readonly:true});
+            const o=db.prepare('SELECT status,amount_paid,paid_at FROM mystery_orders WHERE order_code=?').get('$CODE');
+            console.log(JSON.stringify(o)); db.close();
+          ")
+          echo "  order state: $STATUS"
+          echo "$STATUS" | grep -q '"status":"payment_review"' \
+            || { echo '✗ a made-up UTR moved the order out of review'; exit 1; }
+          echo "$STATUS" | grep -q '"amount_paid":null' \
+            || { echo '✗ unverified money was recorded as received'; exit 1; }
+          echo "$STATUS" | grep -q '"paid_at":null' \
+            || { echo '✗ unverified payment got a paid_at timestamp'; exit 1; }
+          echo "✓ self-reported payment stays in review with no money recorded"
+
       - name: Verify production config guards reject unsafe settings
         run: |
           set -e
