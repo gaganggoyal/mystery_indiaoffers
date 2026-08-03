@@ -1,11 +1,13 @@
 'use strict';
 
 const router = require('express').Router();
+const path = require('path');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const config = require('../config');
 const { sendMail } = require('../services/mailer');
 const { adminAuth, signAdmin, cookieOpts } = require('../middleware/auth');
+const { loginLimiter } = require('../middleware/rate-limit');
 const { PLANS, SCORE_PILLARS, ORDER_STATUSES, getPlan, formatInr, statusMeta } = require('../data/plans');
 
 function parseJson(s, f) {
@@ -16,7 +18,7 @@ router.get('/login', (req, res) => {
   res.render('admin/login', { title: 'Admin Login', error: null, config });
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const rows = await db.query('SELECT * FROM admins WHERE email = ?', [req.body.email || '']);
   if (!rows.length || !(await bcrypt.compare(req.body.password || '', rows[0].password_hash))) {
     return res.status(401).render('admin/login', { title: 'Admin Login', error: 'Invalid credentials', config });
@@ -32,6 +34,16 @@ router.post('/logout', (req, res) => {
 });
 
 router.use(adminAuth);
+
+// Payment proofs (customer bank/UPI screenshots) — admin-only, served from the
+// private upload dir. basename() strips any path so `../` cannot escape it.
+router.get('/proof/:file', (req, res) => {
+  const name = path.basename(String(req.params.file || ''));
+  if (!/^pay-[\w.-]+\.(jpe?g|png|webp|pdf)$/i.test(name)) return res.status(404).send('Not found');
+  res.sendFile(path.join(config.paths.UPLOAD_DIR, name), err => {
+    if (err && !res.headersSent) res.status(404).send('Proof not found');
+  });
+});
 
 router.get('/', async (req, res, next) => {
   try {

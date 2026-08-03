@@ -11,14 +11,44 @@ const app = express();
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
-app.set('trust proxy', true);
+// Exactly one proxy hop (nginx on the same VPS). `true` would trust any
+// client-supplied X-Forwarded-For and let attackers spoof IPs past rate limits.
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
 
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(
+  helmet({
+    // Self-hosted CSS/JS only, plus inline styles the EJS templates already use.
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        fontSrc: ["'self'", 'data:'],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        upgradeInsecureRequests: config.isProd ? [] : null
+      }
+    },
+    crossOriginEmbedderPolicy: false,
+    hsts: config.isProd ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false
+  })
+);
 app.use(morgan(config.isProd ? 'combined' : 'dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Bound request bodies; nothing here legitimately posts more than a few KB.
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(
+  express.static(path.join(__dirname, '..', 'public'), {
+    maxAge: config.isProd ? '7d' : 0,
+    // Uploads moved out of public/, but stay explicit in case a stray file lands.
+    dotfiles: 'ignore'
+  })
+);
 
 const { getPlan, formatInr: fmtInr } = require('./data/plans');
 app.use((req, res, next) => {

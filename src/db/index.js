@@ -3,8 +3,10 @@
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
+const config = require('../config');
 
-const dataDir = path.join(__dirname, '..', '..', 'data');
+// DATA_DIR lets the VPS keep the DB on a backed-up volume outside the deploy dir.
+const dataDir = config.paths.data;
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const sqlite = new Database(path.join(dataDir, 'emystery.db'));

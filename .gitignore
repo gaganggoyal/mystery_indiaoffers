@@ -13,9 +13,12 @@ data/*.db-shm
 data/*.db-wal
 data/*.sqlite
 data/*.sqlite3
+data/backups/
 !data/.gitkeep
 
-# Uploads (payment proofs, etc.)
+# Uploads (payment proofs = customer bank/UPI screenshots).
+# Served only via the authenticated /admin/proof route, never by express.static.
+data/uploads/
 public/uploads/**
 !public/uploads/.gitkeep
 

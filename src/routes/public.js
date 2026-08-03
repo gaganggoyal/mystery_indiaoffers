@@ -8,12 +8,16 @@ const multer = require('multer');
 const db = require('../db');
 const config = require('../config');
 const { sendMail } = require('../services/mailer');
+const { bookingLimiter, payLimiter, trackLimiter } = require('../middleware/rate-limit');
 const {
   PLANS, COST_POLICY, SCORE_PILLARS, CUSTOM_RETURN_ADDON,
   getPlan, formatInr, statusMeta
 } = require('../data/plans');
 
-const UPLOAD_DIR = path.join(__dirname, '..', '..', 'public', 'uploads');
+// Payment proofs are bank/UPI screenshots — customer financial data. They live
+// outside public/ so express.static can never serve them; admins read them
+// through the authenticated /admin/proof/:file route instead.
+const { UPLOAD_DIR } = require('../config').paths;
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const uploadProof = multer({
@@ -21,10 +25,11 @@ const uploadProof = multer({
     destination: (req, file, cb) => cb(null, UPLOAD_DIR),
     filename: (req, file, cb) => {
       const ext = (path.extname(file.originalname).toLowerCase().match(/^\.(jpe?g|png|webp|pdf)$/) || ['.jpg'])[0];
-      cb(null, `pay-${Date.now().toString(36)}${ext}`);
+      // Random suffix, not just a timestamp — timestamps are enumerable.
+      cb(null, `pay-${Date.now().toString(36)}-${crypto.randomBytes(8).toString('hex')}${ext}`);
     }
   }),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
   fileFilter: (req, file, cb) => cb(null, /^(image\/|application\/pdf)/.test(file.mimetype))
 }).single('payment_proof');
 
@@ -65,6 +70,46 @@ function locals(extra) {
     waUrl: `https://wa.me/${config.support.whatsappDigits}`
   }, extra);
 }
+
+// Liveness probe for systemd / uptime monitors / nginx. Touches the DB so a
+// 200 means "can actually serve orders", not just "process is alive".
+router.get('/healthz', (req, res) => {
+  try {
+    db.sqlite.prepare('SELECT 1').get();
+    res.json({ ok: true, uptime: Math.round(process.uptime()), version: require('../../package.json').version });
+  } catch (err) {
+    res.status(503).json({ ok: false, error: 'database unavailable' });
+  }
+});
+
+router.get('/robots.txt', (req, res) => {
+  res.type('text/plain').send(
+    [
+      'User-agent: *',
+      // Order, pay and report URLs are token-bearing and must never be indexed.
+      'Disallow: /admin',
+      'Disallow: /order/',
+      'Disallow: /pay/',
+      'Disallow: /report/',
+      'Allow: /',
+      '',
+      `Sitemap: ${config.siteUrl}/sitemap.xml`,
+      ''
+    ].join('\n')
+  );
+});
+
+const PUBLIC_URLS = ['/', '/pricing', '/how-it-works', '/sample-report', '/costs', '/faq', '/book', '/track'];
+
+router.get('/sitemap.xml', (req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const urls = PUBLIC_URLS.map(
+    u => `  <url><loc>${config.siteUrl}${u}</loc><lastmod>${today}</lastmod></url>`
+  ).join('\n');
+  res.type('application/xml').send(
+    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`
+  );
+});
 
 router.get('/', (req, res) => {
   res.render('home', locals({
@@ -133,7 +178,7 @@ router.get('/book', (req, res) => {
   }));
 });
 
-router.post('/book', async (req, res, next) => {
+router.post('/book', bookingLimiter, async (req, res, next) => {
   try {
     const plan = getPlan(req.body.plan_id);
     if (!plan) {
@@ -298,7 +343,7 @@ router.get('/pay/:code', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/pay/:code', (req, res) => {
+router.post('/pay/:code', payLimiter, (req, res) => {
   uploadProof(req, res, async err => {
     try {
       const token = req.query.t || req.body.t;
@@ -313,7 +358,8 @@ router.post('/pay/:code', (req, res) => {
 
       const method = String(req.body.payment_method || 'upi');
       const ref = String(req.body.payment_ref || '').trim().slice(0, 80);
-      const proof = req.file ? '/uploads/' + req.file.filename : null;
+      // Store the bare filename; the admin route resolves it inside UPLOAD_DIR.
+      const proof = req.file ? req.file.filename : null;
 
       const totalDue = (order.price_inr || 0) + (order.product_deposit_inr || 0);
 
@@ -378,7 +424,7 @@ router.get('/track', (req, res) => {
   res.render('track', locals({ title: 'Track Order', description: '', error: null, form: {} }));
 });
 
-router.post('/track', async (req, res, next) => {
+router.post('/track', trackLimiter, async (req, res, next) => {
   try {
     const code = String(req.body.order_code || '').trim().toUpperCase();
     const email = String(req.body.email || '').trim().toLowerCase();
