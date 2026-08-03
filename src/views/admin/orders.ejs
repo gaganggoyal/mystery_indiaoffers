@@ -1,0 +1,28 @@
+<%- include('_layout-top') %>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+  <h1 style="color:var(--ink)">Orders</h1>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <a class="btn-ghost btn-sm" href="/admin/orders">All</a>
+    <% ORDER_STATUSES.forEach(s => { %>
+      <a class="btn-ghost btn-sm <%= status === s.id ? 'btn-primary' : '' %>" href="/admin/orders?status=<%= s.id %>" style="<%= status === s.id ? 'background:var(--brand);color:#fff;border:0' : '' %>"><%= s.label %></a>
+    <% }) %>
+  </div>
+</div>
+<table class="admin-table">
+  <thead><tr><th>Code</th><th>Plan</th><th>Client</th><th>URL</th><th>Status</th><th>Paid</th><th></th></tr></thead>
+  <tbody>
+    <% if (!orders.length) { %><tr><td colspan="7" class="muted">No orders</td></tr><% } %>
+    <% orders.forEach(o => { %>
+      <tr>
+        <td><b><%= o.order_code %></b></td>
+        <td><%= o.plan_name %></td>
+        <td><%= o.client_name %><br><span class="muted" style="font-size:12px"><%= o.client_email %></span></td>
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= o.brand_url %></td>
+        <td><span class="status-chip" style="background:<%= statusMeta(o.status).color %>"><%= statusMeta(o.status).label %></span></td>
+        <td><%= formatInr(o.price_inr) %></td>
+        <td><a href="/admin/orders/<%= o.id %>" style="color:var(--brand);font-weight:700">Open →</a></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<%- include('_layout-bottom') %>

@@ -1,0 +1,87 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+
+<section class="wrap">
+  <div class="page-head">
+    <h1>Pay for order <%= order.order_code %></h1>
+    <p><%= order.plan_name %> · pay total below to start the shop</p>
+  </div>
+
+  <% if (error) { %><div class="form-err"><%= error %></div><% } %>
+
+  <div class="card" style="margin-bottom:18px;max-width:720px">
+    <h3 style="color:var(--ink);margin-bottom:10px">Payment breakdown</h3>
+    <table class="table">
+      <tr><td>Service fee (our work)</td><td style="text-align:right"><b><%= formatInr(order.price_inr) %></b></td></tr>
+      <tr>
+        <td>Product deposit (seller-funded cart<%= plan && plan.sellerFundsProduct ? ' — 100%' : productDeposit ? ' — over budget' : '' %>)</td>
+        <td style="text-align:right"><b><%= formatInr(productDeposit) %></b></td>
+      </tr>
+      <% if (order.return_addon) { %>
+        <tr><td colspan="2" class="muted" style="font-size:13px">Includes return-test add-on in service fee</td></tr>
+      <% } %>
+      <tr style="background:var(--brand-soft)">
+        <td><b>Total to pay now</b></td>
+        <td style="text-align:right"><b style="font-size:20px;color:var(--brand)"><%= formatInr(totalDue) %></b></td>
+      </tr>
+    </table>
+    <% if (plan && plan.sellerFundsProduct) { %>
+      <p class="note" style="margin-top:12px">
+        <b>Customized plan:</b> fixed fee per order + you fund the product fully.
+        Non-returnable product cost stays with you. If the live cart exceeds the deposit, we’ll ask for a top-up before buying.
+      </p>
+    <% } else if (productDeposit > 0) { %>
+      <p class="note" style="margin-top:12px">Product deposit covers cart amount above the plan’s included product budget.</p>
+    <% } %>
+  </div>
+
+  <div class="pay-grid">
+    <div class="pay-box">
+      <h3>Pay via UPI</h3>
+      <p>Send exactly <b style="color:#fff"><%= formatInr(totalDue) %></b> to:</p>
+      <code><%= payment.upiId %></code>
+      <p style="font-size:13px">Name: <%= payment.upiName %></p>
+      <p style="font-size:13px;margin-top:8px">In UPI note, put: <b style="color:#fff"><%= order.order_code %></b></p>
+      <% if (payment.bankAccount) { %>
+        <hr style="border:0;border-top:1px solid rgba(255,255,255,.15);margin:16px 0">
+        <h3>Or bank transfer</h3>
+        <p style="font-size:13.5px;line-height:1.7">
+          Account: <%= payment.bankName %><br>
+          A/C: <%= payment.bankAccount %><br>
+          IFSC: <%= payment.bankIfsc %><br>
+          Bank: <%= payment.bank %>
+        </p>
+      <% } %>
+      <p style="margin-top:14px;font-size:12.5px;opacity:.85">A product of <%= company.name %></p>
+    </div>
+
+    <div class="form-card" style="max-width:none">
+      <h3 style="color:var(--ink);margin-bottom:8px">Confirm payment</h3>
+      <form method="post" action="/pay/<%= order.order_code %>?t=<%= order.access_token %>" enctype="multipart/form-data">
+        <input type="hidden" name="t" value="<%= order.access_token %>">
+        <label>Payment method
+          <select name="payment_method">
+            <option value="upi">UPI</option>
+            <option value="bank">Bank transfer</option>
+            <% if (testPayEnabled) { %><option value="test">Test payment (instant — demo)</option><% } %>
+          </select>
+        </label>
+        <label>UTR / UPI reference
+          <input name="payment_ref" placeholder="e.g. 123456789012" maxlength="80">
+        </label>
+        <label>Screenshot (optional)
+          <input type="file" name="payment_proof" accept="image/*,application/pdf">
+        </label>
+        <button class="btn-primary btn-block" type="submit" style="margin-top:16px">I’ve paid <%= formatInr(totalDue) %> — confirm →</button>
+      </form>
+      <% if (testPayEnabled) { %>
+        <p class="note" style="margin-top:12px">Demo mode: choose <b>Test payment</b> to mark paid instantly.</p>
+      <% } %>
+      <p class="muted" style="margin-top:12px;font-size:13px">
+        Order for: <%= order.client_name %> · <a href="/order/<%= order.order_code %>?t=<%= order.access_token %>">View order status</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

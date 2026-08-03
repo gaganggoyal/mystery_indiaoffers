@@ -1,0 +1,77 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+
+<section class="wrap">
+  <div class="page-head">
+    <p class="kicker">Order <%= order.order_code %> · <%= order.plan_name %></p>
+    <h1>Mystery shop report</h1>
+    <p class="muted" style="word-break:break-all"><%= order.brand_url %></p>
+  </div>
+
+  <div class="report-head">
+    <div>
+      <% if (report.verdict) { %><h2 style="color:var(--ink);max-width:560px"><%= report.verdict %></h2><% } %>
+      <% if (report.would_buy_again != null) { %>
+        <p style="margin-top:8px;font-weight:700;color:<%= report.would_buy_again ? 'var(--good)' : 'var(--danger)' %>">
+          Would buy again: <%= report.would_buy_again ? 'Yes' : 'No' %>
+        </p>
+      <% } %>
+    </div>
+    <div class="score-ring" style="width:140px;height:140px">
+      <div class="inner"><b><%= report.overall_score %></b><small>/100</small></div>
+    </div>
+  </div>
+
+  <% if (report.executive_summary) { %>
+    <div class="card">
+      <h3 style="color:var(--ink)">Executive summary</h3>
+      <p style="margin-top:8px;white-space:pre-wrap"><%= report.executive_summary %></p>
+    </div>
+  <% } %>
+
+  <div class="card" style="margin-top:14px">
+    <h3 style="color:var(--ink);margin-bottom:12px">Pillar scores</h3>
+    <div class="bars">
+      <% pillars.forEach(p => {
+        const s = scores[p.key] != null ? scores[p.key] : 0;
+        const pct = Math.round((s / p.max) * 100);
+      %>
+        <div>
+          <div class="bar-lab"><span><%= p.label %></span><b><%= s %>/<%= p.max %></b></div>
+          <div class="bar"><i style="width:<%= pct %>%"></i></div>
+          <% if (sections[p.key]) { %><p class="muted" style="font-size:13.5px;margin:6px 0 4px;white-space:pre-wrap"><%= sections[p.key] %></p><% } %>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+
+  <% if (fixes && fixes.length) { %>
+    <div class="card" style="margin-top:14px">
+      <h3 style="color:var(--ink)">Top fixes</h3>
+      <ol class="fixes">
+        <% fixes.forEach(f => { %><li><%= f %></li><% }) %>
+      </ol>
+    </div>
+  <% } %>
+
+  <% if (report.evidence_notes) { %>
+    <div class="card" style="margin-top:14px">
+      <h3 style="color:var(--ink)">Evidence notes</h3>
+      <p style="margin-top:8px;white-space:pre-wrap"><%= report.evidence_notes %></p>
+    </div>
+  <% } %>
+
+  <% if (sections.extra) { %>
+    <div class="card" style="margin-top:14px">
+      <h3 style="color:var(--ink)">Additional notes</h3>
+      <p style="margin-top:8px;white-space:pre-wrap"><%= sections.extra %></p>
+    </div>
+  <% } %>
+
+  <p class="muted center" style="margin:28px 0;font-size:13px">
+    Prepared by IndiaOffers E-Mystery · a product of <%= company.name %><br>
+    <a href="/order/<%= order.order_code %>?t=<%= order.access_token %>" style="color:var(--brand);font-weight:700">← Back to order</a>
+  </p>
+</section>
+
+<%- include('partials/footer') %>

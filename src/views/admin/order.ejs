@@ -1,0 +1,122 @@
+<%- include('_layout-top') %>
+
+<% if (saved) { %><div class="form-ok">Saved.</div><% } %>
+<% if (published) { %><div class="form-ok">Report published &amp; client emailed.</div><% } %>
+
+<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+  <div>
+    <h1 style="color:var(--ink)"><%= order.order_code %></h1>
+    <p class="muted"><%= order.plan_name %> · <%= formatInr(order.price_inr) %> ·
+      <span class="status-chip" style="background:<%= statusMeta(order.status).color %>"><%= statusMeta(order.status).label %></span>
+    </p>
+  </div>
+  <a class="btn-ghost btn-sm" href="/order/<%= order.order_code %>?t=<%= order.access_token %>" target="_blank">Client view ↗</a>
+</div>
+
+<div class="grid-3" style="margin-bottom:18px">
+  <div class="card">
+    <h3>Client</h3>
+    <p style="margin-top:8px;font-size:14px"><b><%= order.client_name %></b><br><%= order.client_email %><br><%= order.client_phone || '—' %><br><%= order.client_company || '' %></p>
+  </div>
+  <div class="card">
+    <h3>Target</h3>
+    <p style="margin-top:8px;font-size:13.5px;word-break:break-all"><a href="<%= order.brand_url %>" target="_blank" style="color:var(--brand)"><%= order.brand_url %></a></p>
+    <p class="muted" style="font-size:12.5px;margin-top:6px"><%= order.platform || '' %> · <%= order.category || '' %></p>
+    <% if (competitors.length) { %><p style="font-size:12.5px;margin-top:6px">Competitors: <%= competitors.join(' | ') %></p><% } %>
+  </div>
+  <div class="card">
+    <h3>Payment</h3>
+    <p style="margin-top:8px;font-size:14px">
+      Service fee: <b><%= formatInr(order.price_inr) %></b><br>
+      Product deposit: <b><%= formatInr(order.product_deposit_inr || 0) %></b><br>
+      <% if (order.return_addon) { %>Return add-on: yes<br><% } %>
+      Amount paid: <%= order.amount_paid != null ? formatInr(order.amount_paid) : '—' %><br>
+      Method: <%= order.payment_method || '—' %><br>
+      Ref: <%= order.payment_ref || '—' %><br>
+      Paid at: <%= order.paid_at || '—' %><br>
+      <% if (order.payment_proof) { %><a href="<%= order.payment_proof %>" target="_blank" style="color:var(--brand)">Proof ↗</a><% } %>
+    </p>
+  </div>
+</div>
+
+<% if (order.product_notes || order.special_brief) { %>
+  <div class="card" style="margin-bottom:16px">
+    <h3>Brief</h3>
+    <% if (order.product_notes) { %><p style="margin-top:8px;white-space:pre-wrap"><b>Product notes:</b> <%= order.product_notes %></p><% } %>
+    <% if (order.special_brief) { %><p style="margin-top:8px;white-space:pre-wrap"><b>Special:</b> <%= order.special_brief %></p><% } %>
+  </div>
+<% } %>
+
+<div class="card" style="margin-bottom:18px">
+  <h3 style="margin-bottom:10px">Order ops</h3>
+  <form method="post" action="/admin/orders/<%= order.id %>">
+    <input type="hidden" name="action" value="save_order">
+    <div class="two">
+      <label>Status
+        <select name="status">
+          <% ORDER_STATUSES.forEach(s => { %>
+            <option value="<%= s.id %>" <%= order.status === s.id ? 'selected' : '' %>><%= s.label %></option>
+          <% }) %>
+        </select>
+      </label>
+      <label>Assigned to<input name="assigned_to" value="<%= order.assigned_to || '' %>" placeholder="Shopper name"></label>
+    </div>
+    <div class="two">
+      <label>ETA date<input type="date" name="eta_date" value="<%= order.eta_date || '' %>"></label>
+      <label>Payment ref<input name="payment_ref" value="<%= order.payment_ref || '' %>"></label>
+    </div>
+    <label>Admin notes<textarea name="admin_notes" rows="3"><%= order.admin_notes || '' %></textarea></label>
+    <button class="btn-primary" type="submit" style="margin-top:12px">Save order</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3 style="margin-bottom:10px">Report scorecard</h3>
+  <form method="post" action="/admin/orders/<%= order.id %>">
+    <input type="hidden" name="action" value="save_report">
+    <label>Verdict (headline)<input name="verdict" value="<%= report && report.verdict || '' %>" placeholder="Solid product, leaky checkout trust"></label>
+    <label>Executive summary<textarea name="executive_summary" rows="4"><%= report && report.executive_summary || '' %></textarea></label>
+    <div class="two">
+      <label>Overall score (auto if blank)<input type="number" name="overall_score" min="0" max="100" value="<%= report && report.overall_score != null ? report.overall_score : '' %>"></label>
+      <label>Would buy again?
+        <select name="would_buy_again">
+          <option value="">N/A</option>
+          <option value="1" <%= report && report.would_buy_again === 1 ? 'selected' : '' %>>Yes</option>
+          <option value="0" <%= report && report.would_buy_again === 0 ? 'selected' : '' %>>No</option>
+        </select>
+      </label>
+    </div>
+
+    <h4 style="margin:16px 0 8px;color:var(--ink)">Pillar scores &amp; notes</h4>
+    <% pillars.forEach(p => { %>
+      <div class="two">
+        <label><%= p.label %> (max <%= p.max %>)
+          <input type="number" name="score_<%= p.key %>" min="0" max="<%= p.max %>" value="<%= scores[p.key] != null ? scores[p.key] : '' %>">
+        </label>
+        <label>Notes
+          <textarea name="section_<%= p.key %>" rows="2"><%= sections[p.key] || '' %></textarea>
+        </label>
+      </div>
+    <% }) %>
+
+    <label>Top fixes (one per line)<textarea name="top_fixes" rows="5" placeholder="Fix shipping fee reveal…&#10;Add size chart…"><%= fixes.join('\n') %></textarea></label>
+    <label>Evidence notes<textarea name="evidence_notes" rows="3"><%= report && report.evidence_notes || '' %></textarea></label>
+    <label>Extra notes<textarea name="section_extra" rows="2"><%= sections.extra || '' %></textarea></label>
+    <label style="display:flex;align-items:center;gap:8px;font-weight:600">
+      <input type="checkbox" name="set_in_progress" value="1" style="width:auto"> If paid, mark order in progress
+    </label>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+      <button class="btn-primary" type="submit">Save report draft</button>
+    </div>
+  </form>
+
+  <form method="post" action="/admin/orders/<%= order.id %>" style="margin-top:12px" onsubmit="return confirm('Publish report to client?')">
+    <input type="hidden" name="action" value="publish_report">
+    <button class="btn-ghost" type="submit" style="border-color:var(--good);color:var(--good)">Publish report + email client</button>
+    <% if (report && report.is_published) { %>
+      <a href="/report/<%= order.order_code %>?t=<%= order.access_token %>" target="_blank" style="margin-left:10px;color:var(--brand);font-weight:700">View published report ↗</a>
+    <% } %>
+  </form>
+</div>
+
+<%- include('_layout-bottom') %>

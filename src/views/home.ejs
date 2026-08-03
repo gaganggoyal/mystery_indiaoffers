@@ -1,0 +1,91 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+
+<section class="hero">
+  <div class="wrap hero-in">
+    <div>
+      <span class="pill">IndiaOffers · E-Mystery Expert</span>
+      <h1>Secret-shop your store like a <span class="grad">real Indian buyer</span></h1>
+      <p class="lead">We buy, unbox, complain, and return — then hand you a scored report with fixes that move conversion and trust. Built by <b><%= company.name %></b> with deep shopping expertise across Amazon, Flipkart, D2C &amp; marketplaces.</p>
+      <div class="hero-cta">
+        <a class="btn-book" href="/book?plan=full">
+          <span class="btn-ico">✦</span> Book a shop — <%= formatInr(fullPlan.price) %>
+        </a>
+        <a class="btn-ghost" href="/sample-report">See sample report</a>
+      </div>
+      <ul class="trust">
+        <li>✓ 0–100 scorecard</li>
+        <li>✓ Photo evidence</li>
+        <li>✓ Clear product-cost rules</li>
+        <li>✓ <a href="/costs">Who pays what?</a></li>
+      </ul>
+    </div>
+    <div class="hero-card">
+      <div class="score-ring">
+        <div class="inner"><b>72</b><small>/100 sample</small></div>
+      </div>
+      <h3 style="text-align:center;color:var(--ink);margin-bottom:4px;font-weight:800">What we score</h3>
+      <ul class="pillar-mini">
+        <% pillars.forEach(p => { %>
+          <li><span><%= p.label %></span><b><%= p.max %></b></li>
+        <% }) %>
+      </ul>
+      <p class="center" style="margin-top:14px">
+        <a href="/how-it-works" style="color:var(--cta);font-weight:800">How a shop works →</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section">
+  <div class="sec-head"><h2>Who this is for</h2></div>
+  <div class="grid-3">
+    <div class="card"><div class="ico">🛍️</div><h3>D2C &amp; Shopify brands</h3><p>Ads are live but conversion is soft. Find checkout, packaging, and trust gaps founders can’t see.</p></div>
+    <div class="card"><div class="ico">📦</div><h3>Amazon / Flipkart sellers</h3><p>Listing looks premium; parcel tells another story. Catch fakes, return traps &amp; seller risk.</p></div>
+    <div class="card"><div class="ico">⚔️</div><h3>Founders vs competitors</h3><p>Same scorecard on you + 2 rivals. See where they win delivery, unboxing, and support.</p></div>
+  </div>
+</section>
+
+<section class="wrap section">
+  <div class="sec-head">
+    <h2>Plans that match real questions</h2>
+    <a href="/pricing">Full pricing →</a>
+  </div>
+  <div class="plans">
+    <% plans.filter(p => ['basic','full','custom','marketplace'].includes(p.id)).forEach(p => { %>
+      <article class="plan <%= p.popular ? 'popular' : '' %>">
+        <% if (p.badge) { %><span class="badge" style="background:<%= p.color %>"><%= p.badge %></span><% } %>
+        <h3><%= p.name %></h3>
+        <p class="tagline"><%= p.tagline %></p>
+        <div class="price"><b><%= formatInr(p.price) %></b><% if (p.compareAt) { %><s><%= formatInr(p.compareAt) %></s><% } %></div>
+        <p class="muted" style="font-size:13px">Report in ~<%= p.turnaroundDays %> days</p>
+        <ul>
+          <% p.includes.slice(0,5).forEach(i => { %><li>✓ <%= i %></li><% }) %>
+        </ul>
+        <a class="btn-book btn-block" href="/book?plan=<%= p.id %>" style="border-radius:14px">✦ Book <%= p.name %></a>
+      </article>
+    <% }) %>
+  </div>
+</section>
+
+<section class="wrap section">
+  <div class="sec-head"><h2>How it works</h2></div>
+  <ol class="steps">
+    <li><b>1. Book</b><span>Pick a plan, share store URL &amp; brief</span></li>
+    <li><b>2. Pay</b><span>UPI / bank (test pay in demo mode)</span></li>
+    <li><b>3. We shop secret</b><span>Real journey with evidence</span></li>
+    <li><b>4. Report</b><span>Scorecard + top fixes</span></li>
+  </ol>
+  <div class="cta-band">
+    <div>
+      <h2>From the team behind IndiaOffers.in</h2>
+      <p>We already help shoppers stack deals &amp; card offers. E-Mystery points that same expert eye at <em>your</em> store — as a dedicated product of <%= company.name %>.</p>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <a class="btn-book" href="/book?plan=full">✦ Book a shop</a>
+      <a class="btn-ghost" href="<%= waUrl %>?text=<%= encodeURIComponent('Hi, I want an e-mystery shop') %>" target="_blank" rel="noopener">WhatsApp</a>
+    </div>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

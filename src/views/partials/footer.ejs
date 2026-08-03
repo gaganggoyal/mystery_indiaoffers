@@ -1,0 +1,46 @@
+</main>
+
+<a class="fab-book" href="/book?plan=full">✦ Book a shop — from <%= formatInr(typeof fullPlan !== 'undefined' && fullPlan ? fullPlan.price : 1499) %></a>
+
+<footer class="footer">
+  <div class="footer-in">
+    <div>
+      <strong style="color:#fff;font-size:18px;letter-spacing:-.3px">IndiaOffers E-Mystery</strong>
+      <p style="margin-top:6px;font-size:13px;font-weight:700;color:#5eead4">mystery.indiaoffers.in</p>
+      <p style="margin-top:10px;font-size:14.5px;line-height:1.55;max-width:320px">
+        Secret online mystery shops for D2C, Shopify &amp; Indian marketplaces.
+        Scored reports that fix conversion and trust.
+      </p>
+      <div class="company-badge">
+        🏢 Built by <a href="<%= company.url %>" style="display:inline;color:#fff;font-weight:800"><%= company.name %></a>
+      </div>
+      <p style="margin-top:16px">
+        <a class="btn-book btn-sm" href="/book?plan=full" style="display:inline-flex">✦ Book a shop</a>
+      </p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <a href="/pricing">Plans &amp; pricing</a>
+      <a href="/costs">Who pays what</a>
+      <a href="/how-it-works">How it works</a>
+      <a href="/sample-report">Sample report</a>
+      <a href="/book?plan=full">Book Full Journey</a>
+      <a href="/book?plan=custom">Book Customized</a>
+      <a href="/track">Track order</a>
+    </div>
+    <div>
+      <h4>Company</h4>
+      <a href="<%= company.url %>" target="_blank" rel="noopener">IndiaOffers.in home</a>
+      <a href="mailto:<%= support.email %>"><%= support.email %></a>
+      <a href="https://wa.me/<%= support.whatsappDigits %>" target="_blank" rel="noopener">WhatsApp support</a>
+      <a href="/faq">FAQ</a>
+      <a href="/admin/login">Admin</a>
+    </div>
+  </div>
+  <div class="footer-note">
+    © <%= year %> <%= company.name %> · IndiaOffers E-Mystery is a product of IndiaOffers.in.
+    Private brand research only — we do not sell fake public reviews.
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+
+<section class="wrap">
+  <div class="page-head">
+    <p class="kicker"><a href="/">← Home</a></p>
+    <h1>Sample report</h1>
+    <p>Anonymised example for a mid-size Indian D2C fashion brand. Paid reports look like this — with your URLs and evidence.</p>
+  </div>
+  <div class="report-head">
+    <div>
+      <span class="pill">SAMPLE · Full Journey Shop</span>
+      <h2 style="color:var(--ink);margin-top:8px">Brand X — Shopify store</h2>
+      <p class="muted">Shopped from Delhi NCR · Mobile + desktop</p>
+    </div>
+    <div class="score-ring" style="width:140px;height:140px">
+      <div class="inner"><b><%= overall %></b><small>/100</small></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3 style="color:var(--ink)">Verdict</h3>
+    <p style="margin-top:8px"><b>Solid product, leaky checkout trust.</b> Photography is strong; late shipping fees and slow support will cap conversion and repeat rate.</p>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3 style="color:var(--ink);margin-bottom:12px">Pillar scores</h3>
+    <div class="bars">
+      <% pillars.forEach(p => {
+        const s = sampleScores[p.key] || 0;
+        const pct = Math.round((s / p.max) * 100);
+      %>
+        <div>
+          <div class="bar-lab"><span><%= p.label %></span><b><%= s %>/<%= p.max %></b></div>
+          <div class="bar"><i style="width:<%= pct %>%"></i></div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3 style="color:var(--ink)">Top 5 fixes</h3>
+    <ol class="fixes">
+      <% sampleFixes.forEach(f => { %><li><%= f %></li><% }) %>
+    </ol>
+  </div>
+  <div class="center" style="margin:32px 0">
+    <a class="btn-primary" href="/book?plan=full">Get your real report — <%= formatInr(fullPlan.price) %></a>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

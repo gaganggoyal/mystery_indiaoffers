@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Environment & secrets (never commit)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# SQLite / local data
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.sqlite
+data/*.sqlite3
+!data/.gitkeep
+
+# Uploads (payment proofs, etc.)
+public/uploads/**
+!public/uploads/.gitkeep
+
+# Logs & debug
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Build / cache
+.cache/
+tmp/
+temp/

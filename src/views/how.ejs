@@ -1,0 +1,72 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+
+<section class="wrap">
+  <div class="page-head">
+    <p class="kicker"><a href="/">← Home</a></p>
+    <h1>How it all works</h1>
+    <p>End-to-end process — including money, product cost, and non-returnable goods.</p>
+  </div>
+
+  <div class="how-grid">
+    <div class="how-step">
+      <span>01</span>
+      <h3 style="color:var(--ink)">You pick a plan &amp; brief us</h3>
+      <p>Choose Basic (no buy) or a plan that buys. Tell us URL, SKU, city, and whether the item is returnable. High-ticket or non-returnable must be called out.</p>
+    </div>
+    <div class="how-step">
+      <span>02</span>
+      <h3 style="color:var(--ink)">You pay the service fee</h3>
+      <p>Fixed plan price via UPI/bank. This is for our work, not unlimited products. If cart will exceed product budget, we collect a product deposit next.</p>
+    </div>
+    <div class="how-step">
+      <span>03</span>
+      <h3 style="color:var(--ink)">We confirm product money</h3>
+      <p>Within budget → we buy with our float. Over budget / non-returnable approved → you deposit the estimated cart total first. No surprise purchases.</p>
+    </div>
+    <div class="how-step">
+      <span>04</span>
+      <h3 style="color:var(--ink)">Secret shop as a stranger</h3>
+      <p>Real device, real payment, no brand emails. Screenshots from discovery → checkout → delivery → unboxing → support (and return if that plan).</p>
+    </div>
+    <div class="how-step">
+      <span>05</span>
+      <h3 style="color:var(--ink)">Returns (only on Return plan)</h3>
+      <p>We file a real return. Refund from merchant offsets our product float. If return is denied, we document it — that’s part of the audit value.</p>
+    </div>
+    <div class="how-step">
+      <span>06</span>
+      <h3 style="color:var(--ink)">Scorecard + fixes</h3>
+      <p>Seven pillars, 0–100 score, top fixes. Private to you — not fake public reviews.</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin:24px 0">
+    <h3 style="color:var(--ink);margin-bottom:10px">Money flow (simple)</h3>
+    <ol class="fixes">
+      <li><b>Service fee</b> → paid to IndiaOffers (always).</li>
+      <li><b>Product + shipping</b> → we pay merchant; covered up to plan product budget.</li>
+      <li><b>Overage / non-returnable deposit</b> → paid by brand before we click Buy.</li>
+      <li><b>Merchant refund</b> (if any) → stays with us to offset float, not refunded as cash on top of service fee.</li>
+    </ol>
+    <p style="margin-top:12px"><a href="/costs" style="color:var(--brand);font-weight:700">Detailed cost policy →</a></p>
+  </div>
+
+  <div class="card" style="margin:24px 0">
+    <h3 style="color:var(--ink);margin-bottom:10px">Scoring pillars</h3>
+    <table class="table">
+      <thead><tr><th>Pillar</th><th>Max</th></tr></thead>
+      <tbody>
+        <% pillars.forEach(p => { %><tr><td><%= p.label %></td><td><%= p.max %></td></tr><% }) %>
+      </tbody>
+    </table>
+    <p class="muted" style="margin-top:10px;font-size:13px">On Basic UX, fulfillment/product/returns are scored lightly or marked N/A (no parcel).</p>
+  </div>
+
+  <div class="center" style="margin:28px 0">
+    <a class="btn-primary" href="/book?plan=full">Book Full Journey</a>
+    <a class="btn-ghost" href="/costs" style="margin-left:10px">Who pays what</a>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

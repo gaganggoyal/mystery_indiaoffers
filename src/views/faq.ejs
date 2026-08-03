@@ -1,0 +1,66 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+
+<section class="wrap">
+  <div class="page-head">
+    <p class="kicker"><a href="/">← Home</a></p>
+    <h1>FAQ</h1>
+    <p>Especially product cost, non-returnables, and how the service actually runs. Full policy: <a href="/costs" style="color:var(--brand);font-weight:700">Who pays what</a>.</p>
+  </div>
+  <div class="faq">
+    <details open>
+      <summary>What am I paying for in the plan price?</summary>
+      <p>Only the <b>service fee</b>: secret shopping, evidence, scorecard, report. Not unlimited free products. Product spend is a separate <b>product budget</b> (or your deposit if higher).</p>
+    </details>
+    <details open>
+      <summary>Who pays the product price at checkout?</summary>
+      <p>We pay the store/marketplace as a normal customer. <b>Standard plans:</b> covered up to product budget; overage = your deposit. <b>Customized plan:</b> fixed service fee only — you pay <b>100% product deposit</b> (item + shipping). See <a href="/pricing">Pricing</a> and <a href="/costs">Who pays what</a>.</p>
+    </details>
+    <details open>
+      <summary>What is the Customized plan?</summary>
+      <p>A <b>fixed fee per mystery order</b> (<%= formatInr(customPlan.price) %> service). No product budget included. Seller funds product fully — ideal for non-returnable SKUs, high ticket, or when you want total control of product spend. Optional return test add-on +<%= formatInr(customReturnAddon) %> if the item is returnable.</p>
+    </details>
+    <details open>
+      <summary>What about non-returnable products?</summary>
+      <p>We only buy them if you <b>pre-approve the exact SKU</b> on the booking form and accept that money won’t come back via return. Cost is still capped by product budget or your deposit. <b>Return &amp; Refund Audit requires a returnable product</b> — we won’t fake a return on non-returnable goods.</p>
+    </details>
+    <details>
+      <summary>What if my product is ₹15,000 (phone, appliance)?</summary>
+      <p>We don’t float large product cost. Options: (1) you pay 100% product deposit before we buy, or (2) you ship a sealed sample to our shopper address. Service fee is still charged in full.</p>
+    </details>
+    <details>
+      <summary>Does shipping / COD count in the product budget?</summary>
+      <p>Yes. Item price + shipping + COD fees all count toward the product budget cap.</p>
+    </details>
+    <details>
+      <summary>If you return the product, do I get the product money back?</summary>
+      <p>No separate cash refund of product on top of the service fee. Merchant refunds offset our product float. You already only paid service (+ any deposit overage). Unused deposit after a cheaper cart can be adjusted case-by-case.</p>
+    </details>
+    <details>
+      <summary>What happens to the product after unboxing?</summary>
+      <p>Full Journey (no return plan): used for photos/evidence; not shipped to the brand by default. Return plan: we try to return it. Brand can request reverse logistics of the sample for an extra fee.</p>
+    </details>
+    <details>
+      <summary>Can I give you a coupon or employee discount?</summary>
+      <p>Public sitewide coupons are fine. Brand-only “mystery shopper” coupons or insider discounts are not — they break secrecy and bias the audit.</p>
+    </details>
+    <details>
+      <summary>Is this fake reviews?</summary>
+      <p>No. Reports are private research for the brand. We never post paid public reviews or manipulate ratings.</p>
+    </details>
+    <details>
+      <summary>Who knows it’s a mystery shop?</summary>
+      <p>Your frontline team shouldn’t. We use non-branding emails/addresses and shop like any customer.</p>
+    </details>
+    <details>
+      <summary>Is this the same as IndiaOffers deals site?</summary>
+      <p>Separate product, same company (<%= company.name %>). Dedicated app for mystery shops only.</p>
+    </details>
+    <details>
+      <summary>How do I pay and get the report?</summary>
+      <p>UPI/bank after booking (test pay in demo). Report arrives on a private link by email when admin publishes; or use Track order with code + email.</p>
+    </details>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

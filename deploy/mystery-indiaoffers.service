@@ -1,0 +1,19 @@
+[Unit]
+Description=IndiaOffers E-Mystery (mystery.indiaoffers.in)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/indiaoffers-emystery
+Environment=NODE_ENV=production
+Environment=PORT=3100
+Environment=SITE_URL=https://mystery.indiaoffers.in
+Environment=SITE_HOST=mystery.indiaoffers.in
+EnvironmentFile=-/var/www/indiaoffers-emystery/.env
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

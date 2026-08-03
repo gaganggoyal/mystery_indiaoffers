@@ -1,0 +1,19 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+
+<section class="wrap">
+  <div class="page-head">
+    <h1>Track your order</h1>
+    <p>Enter the order code from your email (e.g. IO-MS-A1B2C3) and the email you used at booking.</p>
+  </div>
+  <div class="form-card">
+    <% if (error) { %><div class="form-err"><%= error %></div><% } %>
+    <form method="post" action="/track">
+      <label>Order code<input name="order_code" required value="<%= form.order_code || '' %>" placeholder="IO-MS-XXXXXX" style="text-transform:uppercase"></label>
+      <label>Email<input type="email" name="email" required value="<%= form.email || '' %>" placeholder="you@brand.com"></label>
+      <button class="btn-primary btn-block" type="submit" style="margin-top:16px">Find order →</button>
+    </form>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

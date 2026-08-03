@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body style="background:var(--bg)">
+  <div class="login-box">
+    <h1 style="color:var(--ink);font-size:22px;margin-bottom:4px">E-Mystery Admin</h1>
+    <p class="muted" style="margin-bottom:16px;font-size:13px">IndiaOffers company product</p>
+    <% if (error) { %><div class="form-err"><%= error %></div><% } %>
+    <form method="post" action="/admin/login">
+      <label>Email<input type="email" name="email" required placeholder="admin@indiaoffers.in"></label>
+      <label>Password<input type="password" name="password" required></label>
+      <button class="btn-primary btn-block" type="submit" style="margin-top:16px">Log in</button>
+    </form>
+  </div>
+</body>
+</html>

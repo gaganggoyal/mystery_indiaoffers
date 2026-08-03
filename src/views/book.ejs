@@ -1,0 +1,162 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+
+<section class="wrap">
+  <div class="page-head">
+    <p class="kicker"><a href="/pricing">← All plans</a></p>
+    <h1>Book a mystery shop</h1>
+    <p>Service fee is due next. Product budget rules are fixed — see box below. Full policy: <a href="/costs" style="color:var(--brand);font-weight:700">Who pays what</a>.</p>
+  </div>
+
+  <div class="form-card">
+    <div class="plan-summary">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+        <div>
+          <div class="muted" style="font-size:12px;font-weight:800">SELECTED PLAN</div>
+          <div style="font-weight:800;color:var(--ink);font-size:18px"><%= plan.name %></div>
+          <div class="muted" style="font-size:13px"><%= plan.tagline %> · ~<%= plan.turnaroundDays %> days</div>
+        </div>
+        <b><%= formatInr(plan.price) %></b>
+      </div>
+    </div>
+
+    <div class="cost-chip" style="margin-bottom:14px">
+      <div><span>Service fee (fixed<%= plan.sellerFundsProduct ? ' / order' : '' %>)</span><b><%= formatInr(plan.costBreakdown.serviceFee) %></b></div>
+      <div><span>Product budget included</span><b><%= plan.sellerFundsProduct ? '₹0 — seller pays 100%' : (plan.productBudget ? formatInr(plan.productBudget) : '₹0') %></b></div>
+      <div><span>We buy a product?</span><b><%= plan.buysProduct ? 'Yes' : 'No' %></b></div>
+      <div><span>Return test?</span><b><%= plan.includesReturn ? 'Yes — returnable only' : (plan.allowReturnAddon ? 'Optional add-on' : 'No') %></b></div>
+    </div>
+    <% if (plan.sellerFundsProduct) { %>
+      <div class="card warn-card" style="margin-bottom:14px;padding:14px">
+        <h3 style="color:#92400e;margin-bottom:6px">Customized plan — how money works</h3>
+        <ul class="plain-list">
+          <li><b>Fixed service fee:</b> <%= formatInr(plan.price) %> per mystery order (our work only).</li>
+          <li><b>Product price:</b> You pay 100% as a product deposit (item + shipping + COD). Enter estimate below.</li>
+          <li><b>Non-returnable:</b> Fully allowed — you pre-approve SKU and fund the full cart (non-recoverable).</li>
+          <li><b>Pay page total:</b> service fee + product deposit (one UPI/bank payment).</li>
+        </ul>
+      </div>
+    <% } %>
+    <p class="note" style="margin-bottom:14px">
+      <b>You also cover:</b> <%= plan.costBreakdown.youAlsoPay %><br>
+      <b>Non-returnable:</b> <%= plan.costBreakdown.nonReturnable %><br>
+      <b>After shop:</b> <%= plan.costBreakdown.afterShop %>
+    </p>
+
+    <% if (error) { %><div class="form-err"><%= error %></div><% } %>
+
+    <form method="post" action="/book">
+      <label>Plan
+        <select name="plan_id" id="plan_select" onchange="location.href='/book?plan='+this.value">
+          <% plans.forEach(p => { %>
+            <option value="<%= p.id %>" <%= p.id === plan.id ? 'selected' : '' %>><%= p.name %> — <%= formatInr(p.price) %> service</option>
+          <% }) %>
+        </select>
+      </label>
+
+      <div class="two">
+        <label>Your name *<input name="client_name" required maxlength="120" value="<%= form.client_name || '' %>" placeholder="Full name"></label>
+        <label>Work email *<input type="email" name="client_email" required maxlength="150" value="<%= form.client_email || '' %>" placeholder="you@brand.com"></label>
+      </div>
+      <div class="two">
+        <label>Mobile<input name="client_phone" maxlength="15" value="<%= form.client_phone || '' %>" placeholder="10-digit"></label>
+        <label>Company / brand<input name="client_company" maxlength="150" value="<%= form.client_company || '' %>" placeholder="Optional"></label>
+      </div>
+      <label>Store / product / ASIN URL *<input name="brand_url" required maxlength="500" value="<%= form.brand_url || '' %>" placeholder="https://..."></label>
+      <div class="two">
+        <label>Platform
+          <select name="platform">
+            <% ['','shopify','d2c','amazon','flipkart','meesho','myntra','other'].forEach(p => { %>
+              <option value="<%= p %>" <%= form.platform === p ? 'selected' : '' %>><%= p ? p : 'Select…' %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label>Category<input name="category" value="<%= form.category || '' %>" placeholder="Fashion, electronics…"></label>
+      </div>
+      <% if (plan.id === 'competitor') { %>
+        <div class="two">
+          <label>Competitor URL 1<input name="competitor_1" value="<%= form.competitor_1 || '' %>"></label>
+          <label>Competitor URL 2<input name="competitor_2" value="<%= form.competitor_2 || '' %>"></label>
+        </div>
+      <% } else { %>
+        <div class="two">
+          <label>Competitor URL (optional)<input name="competitor_1" value="<%= form.competitor_1 || '' %>"></label>
+          <label>Competitor URL 2 (optional)<input name="competitor_2" value="<%= form.competitor_2 || '' %>"></label>
+        </div>
+      <% } %>
+      <div class="two">
+        <label>Ship to city<input name="shipping_city" value="<%= form.shipping_city || 'Delhi NCR' %>"></label>
+        <label>Pincode<input name="shipping_pincode" value="<%= form.shipping_pincode || '' %>" maxlength="6"></label>
+      </div>
+      <label>Exact product / SKU / size / colour to buy *
+        <textarea name="product_notes" rows="3" <%= plan.buysProduct ? 'required' : '' %> placeholder="e.g. Black M hoodie SKU-H12 — approx price ₹1,299"><%= form.product_notes || '' %></textarea>
+      </label>
+      <div class="two">
+        <label><%= plan.sellerFundsProduct ? 'Estimated product cart (₹) * — full deposit' : 'Approx cart total (₹)' %>
+          <input name="approx_cart" type="number" min="0" step="1"
+            value="<%= form.approx_cart || '' %>"
+            placeholder="<%= plan.sellerFundsProduct ? 'e.g. 2499' : (plan.productBudget || 0) %>"
+            <%= plan.sellerFundsProduct ? 'required' : '' %>>
+        </label>
+        <label>Is this product returnable?
+          <select name="is_returnable" <%= plan.buysProduct ? 'required' : '' %>>
+            <option value="">Select…</option>
+            <option value="yes" <%= form.is_returnable === 'yes' ? 'selected' : '' %>>Yes — returnable</option>
+            <option value="no" <%= form.is_returnable === 'no' ? 'selected' : '' %>>No — non-returnable</option>
+            <option value="unsure" <%= form.is_returnable === 'unsure' ? 'selected' : '' %>>Not sure</option>
+          </select>
+        </label>
+      </div>
+      <% if (plan.allowReturnAddon) { %>
+        <label style="display:flex;gap:10px;align-items:flex-start;font-weight:600">
+          <input type="checkbox" name="return_addon" value="1" style="width:auto;margin-top:4px" <%= form.return_addon ? 'checked' : '' %>>
+          <span>Add <b>Return &amp; refund test</b> (+<%= formatInr(customReturnAddon) %> service) — only if SKU is returnable</span>
+        </label>
+      <% } %>
+
+      <% if (plan.buysProduct) { %>
+        <div class="card warn-card" style="margin:12px 0;padding:14px">
+          <label style="display:flex;gap:10px;align-items:flex-start;font-weight:600;margin:0">
+            <input type="checkbox" name="accept_cost_policy" value="1" required style="width:auto;margin-top:4px"
+              <%= form.accept_cost_policy ? 'checked' : '' %>>
+            <span>
+              <% if (plan.sellerFundsProduct) { %>
+                I understand: <b><%= formatInr(plan.price) %> fixed service fee per order</b>;
+                I pay <b>100% of product + shipping</b> as a product deposit (entered above);
+                non-returnable items are fully my cost and non-recoverable;
+                if the real cart exceeds my estimate, I will top up before purchase.
+              <% } else { %>
+                I understand: plan price is <b>service only</b>; product+shipping is covered only up to
+                <b><%= plan.productBudget ? formatInr(plan.productBudget) : '₹0' %></b>;
+                overage needs my deposit before purchase;
+                non-returnable SKUs need my approval and cost is non-recoverable within budget/deposit.
+                <% if (plan.includesReturn) { %>
+                  <b>Return plan requires a returnable product.</b>
+                <% } %>
+              <% } %>
+              (<a href="/costs" target="_blank">Policy</a>)
+            </span>
+          </label>
+          <label style="display:flex;gap:10px;align-items:flex-start;font-weight:600;margin:12px 0 0">
+            <input type="checkbox" name="approve_non_returnable" value="1" style="width:auto;margin-top:4px"
+              <%= form.approve_non_returnable ? 'checked' : '' %>>
+            <span>If the SKU is non-returnable, I pre-approve purchase and accept that <b>I pay the full product cost</b> (non-recoverable<%= plan.sellerFundsProduct ? ' via deposit' : ' within budget/deposit' %>). Leave unchecked if returnable.</span>
+          </label>
+        </div>
+      <% } %>
+
+      <label>Special brief / persona<textarea name="special_brief" rows="3" placeholder="Act as first-time buyer, ask size help on chat…"><%= form.special_brief || '' %></textarea></label>
+
+      <button class="btn-primary btn-block" type="submit" style="margin-top:18px;border-radius:14px">
+        <% if (plan.sellerFundsProduct) { %>
+          ✦ Continue — service <%= formatInr(plan.price) %> + product deposit
+        <% } else { %>
+          ✦ Continue — pay <%= formatInr(plan.price) %> service fee
+        <% } %>
+      </button>
+      <p class="muted center" style="margin-top:10px;font-size:12.5px">A product of <%= company.name %> · Private research only</p>
+    </form>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

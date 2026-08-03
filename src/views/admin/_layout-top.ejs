@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · Admin</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+<div class="admin-shell">
+  <aside class="admin-side">
+    <div class="brand-admin">🕵️ IO E-Mystery</div>
+    <a href="/admin" class="<%= section === 'dashboard' ? 'on' : '' %>">Dashboard</a>
+    <a href="/admin/orders" class="<%= section === 'orders' ? 'on' : '' %>">Orders</a>
+    <a href="/" target="_blank">View site ↗</a>
+    <form method="post" action="/admin/logout" style="margin-top:20px">
+      <button class="btn-ghost btn-sm" style="width:100%;color:#fff;border-color:#334155">Logout (<%= admin.name %>)</button>
+    </form>
+  </aside>
+  <div class="admin-main">

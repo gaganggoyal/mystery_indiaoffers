@@ -1,0 +1,89 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+
+<section class="wrap">
+  <div class="page-head">
+    <p class="kicker"><a href="/pricing">← Pricing</a></p>
+    <h1><%= costPolicy.title %></h1>
+    <p><%= costPolicy.summary %></p>
+  </div>
+
+  <div class="card policy-callout">
+    <div class="policy-split">
+      <div>
+        <h3>① Service fee (plan price)</h3>
+        <p>What you pay IndiaOffers for the secret shop, evidence, and report. Fixed, listed on each plan.</p>
+      </div>
+      <div>
+        <h3>② Product budget (float)</h3>
+        <p>Max we spend buying as a real customer (item + shipping + COD fees). Included only on plans that buy. Over budget → <b>you deposit first</b>.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3 style="color:var(--ink);margin-bottom:12px">Who pays what</h3>
+    <table class="table policy-table">
+      <thead>
+        <tr><th>Cost</th><th>Who pays</th><th>When</th></tr>
+      </thead>
+      <tbody>
+        <% costPolicy.table.forEach(r => { %>
+          <tr>
+            <td><b><%= r.item %></b></td>
+            <td><%= r.who %></td>
+            <td class="muted"><%= r.when %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2 style="color:var(--ink);margin-bottom:14px">By plan — product money</h2>
+    <div class="plans">
+      <% plans.forEach(p => { %>
+        <article class="plan">
+          <h3><%= p.name %></h3>
+          <div class="price"><b><%= formatInr(p.price) %></b><small class="muted"> service</small></div>
+          <p class="tagline"><%= p.costBreakdown.productBudgetLabel %></p>
+          <ul>
+            <li><b>You pay us:</b> <%= formatInr(p.costBreakdown.serviceFee) %> service</li>
+            <li><b>Product:</b> <%= p.costBreakdown.youAlsoPay %></li>
+            <li><b>Non-returnable:</b> <%= p.costBreakdown.nonReturnable %></li>
+            <li><b>After shop:</b> <%= p.costBreakdown.afterShop %></li>
+          </ul>
+          <a class="btn-book btn-block" href="/book?plan=<%= p.id %>" style="border-radius:14px">✦ Book <%= p.name %></a>
+        </article>
+      <% }) %>
+    </div>
+  </div>
+
+  <div class="card" style="margin:20px 0">
+    <h3 style="color:var(--ink);margin-bottom:12px">Rules in plain language</h3>
+    <% costPolicy.rules.forEach(r => { %>
+      <div class="rule-block">
+        <h4><%= r.q %></h4>
+        <p><%= r.a %></p>
+      </div>
+    <% }) %>
+  </div>
+
+  <div class="card warn-card">
+    <h3>⚠ Non-returnable products (important)</h3>
+    <ul class="plain-list">
+      <li>We <b>do not</b> silently buy non-returnable SKUs and eat unlimited loss.</li>
+      <li>You must name the SKU and tick approval on the booking form.</li>
+      <li>Cost is covered only up to the plan product budget; rest is your deposit.</li>
+      <li><b>Return &amp; Refund Audit</b> needs a <b>returnable</b> product — otherwise the return test is meaningless.</li>
+      <li>Examples: sealed cosmetics after open, custom print, innerwear, some electronics, digital codes, “non-returnable” marketplace badges.</li>
+    </ul>
+  </div>
+
+  <div class="center" style="margin:28px 0">
+    <a class="btn-primary" href="/pricing">Back to plans</a>
+    <a class="btn-ghost" href="/faq" style="margin-left:10px">More FAQ</a>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

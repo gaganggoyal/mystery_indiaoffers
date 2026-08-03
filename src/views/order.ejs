@@ -1,0 +1,75 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+
+<section class="wrap">
+  <div class="page-head">
+    <h1>Order <%= order.order_code %></h1>
+    <p>
+      <span class="status-chip" style="background:<%= statusMeta(order.status).color %>"><%= statusMeta(order.status).label %></span>
+      &nbsp; <%= order.plan_name %> · service <%= formatInr(order.price_inr) %>
+      <% if (order.product_deposit_inr) { %> · product deposit <%= formatInr(order.product_deposit_inr) %><% } %>
+    </p>
+  </div>
+
+  <% if (paidFlash) { %><div class="form-ok">✓ Payment recorded. Your mystery shop is in the queue.</div><% } %>
+
+  <%
+    const steps = ['pending_payment','paid','in_progress','completed'];
+    const idx = steps.indexOf(order.status);
+  %>
+  <div class="timeline">
+    <% steps.forEach((s, i) => {
+      const meta = statusMeta(s);
+      let cls = 'tl';
+      if (order.status === 'cancelled') cls += '';
+      else if (i < idx) cls += ' done';
+      else if (i === idx) cls += ' on';
+    %>
+      <div class="<%= cls %>"><%= meta.label %></div>
+    <% }) %>
+  </div>
+
+  <div class="grid-3" style="margin-top:8px">
+    <div class="card">
+      <h3>Store under audit</h3>
+      <p style="margin-top:8px;word-break:break-all"><a href="<%= order.brand_url %>" target="_blank" rel="noopener" style="color:var(--brand);font-weight:700"><%= order.brand_url %></a></p>
+      <% if (competitors && competitors.length) { %>
+        <p class="muted" style="margin-top:8px;font-size:13px">Competitors: <%= competitors.join(', ') %></p>
+      <% } %>
+    </div>
+    <div class="card">
+      <h3>Client</h3>
+      <p style="margin-top:8px"><b><%= order.client_name %></b><br><%= order.client_email %><br><%= order.client_phone || '' %></p>
+    </div>
+    <div class="card">
+      <h3>Money</h3>
+      <p style="margin-top:8px;font-size:14px">
+        Service: <b><%= formatInr(order.price_inr) %></b><br>
+        Product deposit: <b><%= formatInr(order.product_deposit_inr || 0) %></b><br>
+        <% if (order.amount_paid) { %>Paid: <b><%= formatInr(order.amount_paid) %></b><br><% } %>
+        <% if (order.return_addon) { %><span class="muted">Return add-on included</span><br><% } %>
+        ETA report: <b><%= order.eta_date || 'TBD' %></b>
+      </p>
+      <p class="muted" style="font-size:13px;margin-top:6px">Ship city: <%= order.shipping_city || '—' %></p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Actions</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+      <% if (order.status === 'pending_payment') { %>
+        <a class="btn-primary" href="/pay/<%= order.order_code %>?t=<%= order.access_token %>">Complete payment</a>
+      <% } %>
+      <% if (report && report.is_published) { %>
+        <a class="btn-primary" href="/report/<%= order.order_code %>?t=<%= order.access_token %>">Open report (<%= report.overall_score %>/100)</a>
+      <% } else if (order.status === 'completed' || order.status === 'in_progress' || order.status === 'paid') { %>
+        <span class="muted">Report not published yet — we’ll email you when ready.</span>
+      <% } %>
+      <a class="btn-ghost" href="<%= waUrl %>?text=<%= encodeURIComponent('Question about order ' + order.order_code) %>" target="_blank" rel="noopener">WhatsApp support</a>
+    </div>
+  </div>
+
+  <p class="muted center" style="margin-top:20px;font-size:13px">Save this page link — it has your private access token.</p>
+</section>
+
+<%- include('partials/footer') %>

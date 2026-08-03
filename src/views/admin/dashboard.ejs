@@ -1,0 +1,28 @@
+<%- include('_layout-top') %>
+<h1 style="color:var(--ink);margin-bottom:16px">Dashboard</h1>
+<div class="stat-row">
+  <% ORDER_STATUSES.forEach(s => { %>
+    <a class="stat" href="/admin/orders?status=<%= s.id %>">
+      <b><%= counts[s.id] || 0 %></b>
+      <span><%= s.label %></span>
+    </a>
+  <% }) %>
+</div>
+<h2 style="color:var(--ink);font-size:16px;margin:8px 0 12px">Recent orders</h2>
+<table class="admin-table">
+  <thead><tr><th>Code</th><th>Plan</th><th>Client</th><th>Status</th><th>Amount</th><th>Created</th></tr></thead>
+  <tbody>
+    <% if (!recent.length) { %><tr><td colspan="6" class="muted">No orders yet</td></tr><% } %>
+    <% recent.forEach(o => { %>
+      <tr>
+        <td><a href="/admin/orders/<%= o.id %>" style="color:var(--brand);font-weight:700"><%= o.order_code %></a></td>
+        <td><%= o.plan_name %></td>
+        <td><%= o.client_name %><br><span class="muted" style="font-size:12px"><%= o.client_email %></span></td>
+        <td><span class="status-chip" style="background:<%= statusMeta(o.status).color %>"><%= statusMeta(o.status).label %></span></td>
+        <td><%= formatInr(o.price_inr) %></td>
+        <td class="muted"><%= String(o.created_at).slice(0,16) %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<%- include('_layout-bottom') %>

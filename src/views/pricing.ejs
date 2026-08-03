@@ -1,0 +1,77 @@
+<%- include('partials/head') %>
+<%- include('partials/header') %>
+
+<section class="wrap">
+  <div class="page-head">
+    <p class="kicker"><a href="/">← Home</a></p>
+    <h1>Plans &amp; pricing</h1>
+    <p>
+      Every plan has a <b>fixed service fee</b> plus a clear <b>product budget</b> (if we buy).
+      Read <a href="/costs" style="color:var(--brand);font-weight:700">who pays what</a> before booking — especially for non-returnable items.
+    </p>
+  </div>
+
+  <div class="card policy-callout" style="margin-bottom:22px">
+    <h3 style="color:var(--ink);margin-bottom:8px">Quick answer</h3>
+    <p style="margin-bottom:10px"><%= costPolicy.summary %></p>
+    <a class="btn-primary btn-sm" href="/costs">Full cost rules →</a>
+  </div>
+
+  <div class="plans" style="padding-bottom:24px">
+    <% plans.forEach(p => { %>
+      <article class="plan <%= p.popular ? 'popular' : '' %>">
+        <% if (p.badge) { %><span class="badge" style="background:<%= p.color %>"><%= p.badge %></span><% } %>
+        <h3><%= p.name %></h3>
+        <p class="tagline"><%= p.tagline %></p>
+        <div class="price">
+          <b><%= formatInr(p.price) %></b>
+          <% if (p.compareAt) { %><s><%= formatInr(p.compareAt) %></s><% } %>
+          <% if (p.billing === 'monthly') { %><small class="muted">/ month</small><% } %>
+        </div>
+        <p class="muted" style="font-size:12.5px">service fee only</p>
+
+        <div class="cost-chip">
+          <div><span>Service</span><b><%= formatInr(p.costBreakdown.serviceFee) %></b></div>
+          <div><span>Product budget</span><b><%= p.productBudget ? formatInr(p.productBudget) : '₹0' %></b></div>
+          <div><span>We buy product?</span><b><%= p.buysProduct ? 'Yes' : 'No' %></b></div>
+          <div><span>Return test?</span><b><%= p.includesReturn ? 'Yes' : 'No' %></b></div>
+        </div>
+
+        <p class="muted" style="font-size:13px;margin-top:8px">~<%= p.turnaroundDays %> days · <%= p.idealFor %></p>
+        <ul>
+          <% p.includes.forEach(i => { %><li>✓ <%= i %></li><% }) %>
+        </ul>
+        <% if (p.note) { %><p class="note"><%= p.note %></p><% } %>
+        <a class="btn-book btn-block" href="/book?plan=<%= p.id %>" style="border-radius:14px">✦ Book for <%= formatInr(p.price) %></a>
+      </article>
+    <% }) %>
+  </div>
+
+  <div class="card" style="margin-bottom:20px">
+    <h3 style="color:var(--ink);margin-bottom:10px">Non-returnable &amp; expensive products</h3>
+    <ul class="plain-list">
+      <li><b>Return Audit</b> → only returnable SKUs (we won’t fake a return).</li>
+      <li><b>Full / Marketplace</b> → non-returnable only with your written OK; cost within budget or your deposit.</li>
+      <li><b>Phones / appliances / high ticket</b> → you fund 100% product deposit or ship a sealed sample; service fee still applies.</li>
+      <li><b>Above product budget</b> → we pause and invoice the difference before placing the order.</li>
+    </ul>
+    <p style="margin-top:12px"><a href="/costs" style="color:var(--brand);font-weight:700">See full policy →</a></p>
+  </div>
+
+  <div class="card" style="margin:10px 0 20px;border-color:#0f766e">
+    <h3 style="color:var(--ink)">Prefer fixed fee + you fund the product?</h3>
+    <p style="margin:8px 0 12px">
+      Use <b>Customized Plan</b> — <%= formatInr(customPlan.price) %> service per order, <b>₹0 product included</b>.
+      You pay product deposit (especially non-returnable). Book it on this page or
+      <a href="/book?plan=custom" style="color:var(--brand);font-weight:700">book Customized →</a>
+    </p>
+  </div>
+
+  <div class="card center" style="margin:10px 0 30px">
+    <h3 style="color:var(--ink)">Multi-city or 5+ competitor packs?</h3>
+    <p style="margin:8px 0 14px">WhatsApp for a special quote beyond listed plans.</p>
+    <a class="btn-primary" href="<%= waUrl %>?text=<%= encodeURIComponent('Custom e-mystery quote — multi city') %>" target="_blank" rel="noopener">WhatsApp quote</a>
+  </div>
+</section>
+
+<%- include('partials/footer') %>
