@@ -63,7 +63,10 @@ const config = {
     pass: process.env.SMTP_PASS || '',
     from:
       process.env.SMTP_FROM ||
-      'IndiaOffers E-Mystery <noreply@indiaoffers.in>'
+      'IndiaOffers E-Mystery <noreply@indiaoffers.in>',
+    // Where replies land. Defaults to the support address, since the
+    // transactional copy repeatedly invites the client to reply.
+    replyTo: process.env.SMTP_REPLY_TO || process.env.SUPPORT_EMAIL || 'care@indiaoffers.in'
   }
 };
 
