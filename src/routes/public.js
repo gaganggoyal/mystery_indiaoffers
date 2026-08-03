@@ -8,6 +8,7 @@ const multer = require('multer');
 const db = require('../db');
 const config = require('../config');
 const notify = require('../services/notifications');
+const upi = require('../services/upi');
 const { bookingLimiter, payLimiter, trackLimiter } = require('../middleware/rate-limit');
 const {
   PLANS, COST_POLICY, SCORE_PILLARS, CUSTOM_RETURN_ADDON,
@@ -326,6 +327,20 @@ router.get('/pay/:code', async (req, res, next) => {
     const plan = getPlan(order.plan_id);
     const productDeposit = order.product_deposit_inr || 0;
     const totalDue = (order.price_inr || 0) + productDeposit;
+
+    // Prefilled UPI QR + deep link, so the client can't mistype payee or amount.
+    let upiQr = null;
+    let upiLink = null;
+    if (upi.isConfigured()) {
+      const args = { amount: totalDue, orderCode: order.order_code };
+      upiLink = upi.buildUri(args);
+      try {
+        upiQr = await upi.qrDataUri(args);
+      } catch (e) {
+        console.error('[upi] QR render failed:', e.message);
+      }
+    }
+
     res.render('pay', locals({
       title: `Pay ${order.order_code}`,
       description: '',
@@ -333,6 +348,8 @@ router.get('/pay/:code', async (req, res, next) => {
       plan,
       productDeposit,
       totalDue,
+      upiQr,
+      upiLink,
       error: req.query.err || null
     }));
   } catch (err) { next(err); }

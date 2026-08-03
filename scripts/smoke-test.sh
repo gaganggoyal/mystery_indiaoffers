@@ -69,6 +69,25 @@ else
   CODE=""; TOK=""
 fi
 
+head_ "UPI QR"
+if [[ -n "$CODE" ]]; then
+  PAYPAGE=$(curl -sS "$BASE$LOC" 2>/dev/null)
+  if grep -q 'data:image/png;base64' <<<"$PAYPAGE"; then
+    ok "pay page renders an inline UPI QR"
+    grep -qE 'href="upi://pay\?[^"]*am=' <<<"$PAYPAGE" \
+      && ok "QR deep link carries a prefilled amount" \
+      || bad "UPI deep link is missing the amount"
+    grep -qE 'href="upi://pay\?[^"]*pa=[^&"]+' <<<"$PAYPAGE" \
+      && ok "UPI deep link carries a payee VPA" \
+      || bad "UPI deep link is missing the payee"
+  else
+    # Not a failure: the QR is deliberately suppressed until a real VPA is set,
+    # because a QR built from the placeholder would send money nowhere.
+    warn_msg="no QR shown — MYSTERY_UPI_ID is unset or still the placeholder"
+    printf '  \033[33m!\033[0m %s\n' "$warn_msg"
+  fi
+fi
+
 head_ "Payment verification (a typed UTR must not mean 'paid')"
 if [[ -n "$CODE" ]]; then
   curl -sS -o /dev/null -X POST "$BASE/pay/$CODE?t=$TOK" \

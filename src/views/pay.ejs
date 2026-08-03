@@ -38,7 +38,21 @@
   <div class="pay-grid">
     <div class="pay-box">
       <h3>Pay via UPI</h3>
-      <p>Send exactly <b style="color:#fff"><%= formatInr(totalDue) %></b> to:</p>
+      <% if (upiQr) { %>
+        <%# QR encodes payee + exact amount + order code, so nothing can be mistyped. %>
+        <p style="margin-bottom:10px">Scan to pay <b style="color:#fff"><%= formatInr(totalDue) %></b></p>
+        <img src="<%= upiQr %>" alt="UPI QR code to pay <%= formatInr(totalDue) %>"
+             width="200" height="200"
+             style="display:block;background:#fff;padding:8px;border-radius:10px">
+        <p style="font-size:12.5px;margin-top:8px">GPay · PhonePe · Paytm · BHIM</p>
+        <p style="margin-top:10px">
+          <a href="<%= upiLink %>" class="btn-ghost btn-sm" style="display:inline-block">Open in a UPI app ↗</a>
+        </p>
+        <hr style="border:0;border-top:1px solid rgba(255,255,255,.15);margin:14px 0">
+        <p style="font-size:13px">Or send <b style="color:#fff"><%= formatInr(totalDue) %></b> manually to:</p>
+      <% } else { %>
+        <p>Send exactly <b style="color:#fff"><%= formatInr(totalDue) %></b> to:</p>
+      <% } %>
       <code><%= payment.upiId %></code>
       <p style="font-size:13px">Name: <%= payment.upiName %></p>
       <p style="font-size:13px;margin-top:8px">In UPI note, put: <b style="color:#fff"><%= order.order_code %></b></p>

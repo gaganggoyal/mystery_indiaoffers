@@ -25,13 +25,22 @@ function getTransporter() {
 const redactTokens = body =>
   config.isProd ? String(body || '').replace(/([?&]t=)[A-Za-z0-9]+/g, '$1REDACTED') : body;
 
-async function sendMail({ to, subject, text, html }) {
+async function sendMail({ to, subject, text, html, attachments }) {
   const t = getTransporter();
   if (!t) {
-    console.log('\n[mail:log]', { to, subject, text: redactTokens(text).slice(0, 400) }, '\n');
+    console.log(
+      '\n[mail:log]',
+      {
+        to,
+        subject,
+        text: redactTokens(text).slice(0, 400),
+        attachments: (attachments || []).map(a => a.filename).join(', ') || undefined
+      },
+      '\n'
+    );
     return { logged: true };
   }
-  return t.sendMail({ from: config.mail.from, to, subject, text, html });
+  return t.sendMail({ from: config.mail.from, to, subject, text, html, attachments });
 }
 
 module.exports = { sendMail };
