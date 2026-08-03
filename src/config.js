@@ -2,9 +2,19 @@
 
 require('dotenv').config();
 
+const path = require('path');
+
 const isProd = process.env.NODE_ENV === 'production';
+const rootDir = path.join(__dirname, '..');
+const dataDir = process.env.DATA_DIR || path.join(rootDir, 'data');
 
 const config = {
+  paths: {
+    root: rootDir,
+    data: dataDir,
+    // Private: payment proofs contain customer bank details. Never under public/.
+    UPLOAD_DIR: process.env.UPLOAD_DIR || path.join(dataDir, 'uploads')
+  },
   port: parseInt(process.env.PORT || '3100', 10),
   isProd,
   // Production host for this product (subdomain of IndiaOffers)
@@ -47,9 +57,60 @@ const config = {
   }
 };
 
-if (config.isProd && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev_only_change_in_production')) {
-  console.error('[config] Set JWT_SECRET in production.');
-  process.exit(1);
+// ── Production safety checks ────────────────────────────────────────────
+// These run before the server binds. A misconfigured production boot is a
+// security incident, not a warning, so anything unsafe exits non-zero and
+// lets systemd surface the failure instead of silently serving traffic.
+
+// Secrets that ship in the repo / docs and must never reach production.
+const WEAK_SECRETS = new Set([
+  'dev_only_change_in_production',
+  'dev_local_only_change_for_production',
+  'change-me-to-a-long-random-string',
+  'changeme',
+  'secret'
+]);
+
+if (config.isProd) {
+  const fatal = [];
+  const warn = [];
+
+  const secret = process.env.JWT_SECRET || '';
+  if (!secret) {
+    fatal.push('JWT_SECRET is not set.');
+  } else if (WEAK_SECRETS.has(secret.trim().toLowerCase())) {
+    fatal.push('JWT_SECRET is a known placeholder value from .env.example / docs.');
+  } else if (secret.length < 32) {
+    fatal.push(`JWT_SECRET is too short (${secret.length} chars, need >= 32).`);
+  }
+
+  // A localhost SITE_URL in production silently breaks every emailed pay
+  // link and report link, so treat it as fatal rather than shipping dead URLs.
+  if (!/^https:\/\//i.test(config.siteUrl)) {
+    fatal.push(`SITE_URL must be an https:// URL in production (got "${config.siteUrl}").`);
+  } else if (/localhost|127\.0\.0\.1/i.test(config.siteUrl)) {
+    fatal.push(`SITE_URL still points at localhost (got "${config.siteUrl}").`);
+  }
+
+  // Free-order switch. Recoverable only by turning it off, so refuse to boot.
+  if (config.testPayEnabled) {
+    fatal.push('MYSTERY_TEST_PAY is enabled — anyone could mark an order paid. Unset it.');
+  }
+
+  if (!config.payment.upiId || config.payment.upiId === 'indiaoffers@upi') {
+    warn.push('MYSTERY_UPI_ID is unset or still the placeholder — the pay page will show a demo UPI ID.');
+  }
+  if (!config.mail.host) {
+    warn.push('No SMTP_HOST — customer emails will only be written to the log, not delivered.');
+  }
+
+  for (const w of warn) console.warn('[config] WARNING:', w);
+  if (fatal.length) {
+    console.error('\n[config] Refusing to start in production:');
+    for (const f of fatal) console.error('  ✗', f);
+    console.error('\n  Fix these in your .env or systemd EnvironmentFile, then restart.\n');
+    process.exit(1);
+  }
 }
 
 module.exports = config;

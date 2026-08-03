@@ -47,7 +47,7 @@
 
     <form method="post" action="/book">
       <label>Plan
-        <select name="plan_id" id="plan_select" onchange="location.href='/book?plan='+this.value">
+        <select name="plan_id" id="plan_select">
           <% plans.forEach(p => { %>
             <option value="<%= p.id %>" <%= p.id === plan.id ? 'selected' : '' %>><%= p.name %> — <%= formatInr(p.price) %> service</option>
           <% }) %>
@@ -158,5 +158,13 @@
     </form>
   </div>
 </section>
+
+<script>
+  // Reload the form for the chosen plan. A listener rather than an inline
+  // onchange= so the CSP can keep script-src-attr 'none'.
+  document.getElementById('plan_select').addEventListener('change', function () {
+    location.href = '/book?plan=' + encodeURIComponent(this.value);
+  });
+</script>
 
 <%- include('partials/footer') %>

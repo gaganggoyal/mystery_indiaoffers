@@ -1,13 +1,21 @@
 {
-  "name": "indiaoffers-emystery",
+  "name": "mystery_indiaoffers",
   "version": "1.0.0",
   "description": "IndiaOffers E-Mystery — https://mystery.indiaoffers.in — secret online store audits (product of IndiaOffers.in)",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "seed": "node src/db/seed.js"
+    "seed": "node src/db/seed.js",
+    "test": "./scripts/smoke-test.sh",
+    "backup": "./scripts/backup-db.sh"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gaganggoyal/mystery_indiaoffers.git"
+  },
+  "homepage": "https://mystery.indiaoffers.in",
+  "license": "MIT",
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.3.0",
@@ -15,11 +23,12 @@
     "dotenv": "^16.4.5",
     "ejs": "^3.1.10",
     "express": "^4.19.2",
+    "express-rate-limit": "^7.5.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^2.2.0",
-    "nodemailer": "^6.9.14"
+    "nodemailer": "^9.0.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

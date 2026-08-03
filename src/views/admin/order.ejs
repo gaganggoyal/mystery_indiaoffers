@@ -34,7 +34,9 @@
       Method: <%= order.payment_method || '—' %><br>
       Ref: <%= order.payment_ref || '—' %><br>
       Paid at: <%= order.paid_at || '—' %><br>
-      <% if (order.payment_proof) { %><a href="<%= order.payment_proof %>" target="_blank" style="color:var(--brand)">Proof ↗</a><% } %>
+      <% if (order.payment_proof) { /* tolerate legacy "/uploads/x.jpg" rows */ %>
+        <a href="/admin/proof/<%= order.payment_proof.split('/').pop() %>" target="_blank" style="color:var(--brand)">Proof ↗</a>
+      <% } %>
     </p>
   </div>
 </div>
@@ -110,7 +112,7 @@
     </div>
   </form>
 
-  <form method="post" action="/admin/orders/<%= order.id %>" style="margin-top:12px" onsubmit="return confirm('Publish report to client?')">
+  <form method="post" action="/admin/orders/<%= order.id %>" style="margin-top:12px" id="publish_form">
     <input type="hidden" name="action" value="publish_report">
     <button class="btn-ghost" type="submit" style="border-color:var(--good);color:var(--good)">Publish report + email client</button>
     <% if (report && report.is_published) { %>
@@ -118,5 +120,13 @@
     <% } %>
   </form>
 </div>
+
+<script>
+  // Publishing emails the client, so confirm first. Listener rather than an
+  // inline onsubmit= so the CSP can keep script-src-attr 'none'.
+  document.getElementById('publish_form').addEventListener('submit', function (e) {
+    if (!confirm('Publish report and email it to the client?')) e.preventDefault();
+  });
+</script>
 
 <%- include('_layout-bottom') %>
