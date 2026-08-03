@@ -45,6 +45,16 @@ const config = {
   testPayEnabled:
     process.env.NODE_ENV !== 'production' ||
     /^(1|true|yes)$/i.test(process.env.MYSTERY_TEST_PAY || ''),
+
+  // Review each booking before asking for money (default on).
+  //
+  // The deposit is derived from `approx_cart`, which the client types in — and
+  // on Customized they fund 100% of it — so quoting after a human has read the
+  // brief avoids under-collecting and lets unsuitable work be declined before
+  // any payment. Set MYSTERY_REVIEW_BEFORE_PAY=0 to send clients straight to
+  // the pay page with the auto-calculated figures instead.
+  reviewBeforePay: !/^(0|false|no)$/i.test(process.env.MYSTERY_REVIEW_BEFORE_PAY || ''),
+  reviewSlaHours: parseInt(process.env.MYSTERY_REVIEW_SLA_HOURS || '24', 10),
   mail: {
     host: process.env.SMTP_HOST || '',
     port: parseInt(process.env.SMTP_PORT || '587', 10),

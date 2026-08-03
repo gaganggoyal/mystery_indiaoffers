@@ -310,12 +310,20 @@ const SCORE_PILLARS = [
 /**
  * Order lifecycle.
  *
- * `payment_review` exists because payment is self-reported: the client types a
- * UTR / uploads a screenshot, which is a *claim* that money was sent, not proof.
- * Nothing may reach `paid` — the state that tells a shopper to start spending
- * the product budget — until a human matches it against the bank statement.
+ * Two human checkpoints, at the two places this business can lose money:
+ *
+ *   awaiting_review — the brief and the quote. `approx_cart` is typed by the
+ *     client, and on Customized they fund 100% of it, so a lowballed estimate
+ *     means under-collecting. Review is where we confirm scope and set the
+ *     real figures before asking for anything.
+ *
+ *   payment_review — the money. Payment is self-reported: the client enters a
+ *     UTR or uploads a screenshot, which is a *claim*, not proof. Nothing may
+ *     reach `paid` — the state that tells a shopper to start spending the
+ *     product budget — until a human matches it against the bank statement.
  */
 const ORDER_STATUSES = [
+  { id: 'awaiting_review', label: 'Reviewing your brief', color: '#8b5cf6' },
   { id: 'pending_payment', label: 'Awaiting payment', color: '#f59e0b' },
   { id: 'payment_review', label: 'Verifying payment', color: '#d97706' },
   { id: 'paid', label: 'Paid — in queue', color: '#0ea5e9' },
@@ -324,8 +332,11 @@ const ORDER_STATUSES = [
   { id: 'cancelled', label: 'Cancelled', color: '#94a3b8' }
 ];
 
-/** Statuses where the client has done their part and we owe them work. */
-const ACTIVE_STATUSES = ['payment_review', 'paid', 'in_progress'];
+/** Statuses where the client has done their part and we owe them a response. */
+const ACTIVE_STATUSES = ['awaiting_review', 'payment_review', 'paid', 'in_progress'];
+
+/** Statuses in which no money has been collected yet. */
+const UNPAID_STATUSES = ['awaiting_review', 'pending_payment', 'payment_review'];
 
 function getPlan(id) {
   return PLANS.find(p => p.id === String(id || '').toLowerCase()) || null;
@@ -347,6 +358,7 @@ module.exports = {
   SCORE_PILLARS,
   ORDER_STATUSES,
   ACTIVE_STATUSES,
+  UNPAID_STATUSES,
   getPlan,
   formatInr,
   statusMeta

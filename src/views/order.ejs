@@ -19,8 +19,31 @@
     </div>
   <% } %>
 
+  <% if (receivedFlash) { %>
+    <div class="form-ok">
+      ✓ Booking received. Our team is reviewing your brief and will email your payment
+      link within <%= config.reviewSlaHours %> hours. Nothing is payable yet.
+    </div>
+  <% } %>
+
+  <% if (order.status === 'awaiting_review') { %>
+    <div class="card" style="margin:14px 0;border-color:#8b5cf6">
+      <h3>We're reviewing your brief</h3>
+      <p style="margin-top:8px;font-size:14.5px;line-height:1.7">
+        Our team is checking the product, the shipping location and whether the item can be
+        returned, so we can confirm the exact figure. You'll get an email with a secure
+        payment link within <b><%= config.reviewSlaHours %> hours</b> (working days).
+      </p>
+      <p class="muted" style="margin-top:10px;font-size:13.5px">
+        Nothing is payable yet — you're not committed until you pay. Need to change
+        something? <a href="<%= waUrl %>" style="color:var(--brand);font-weight:700">WhatsApp us</a>
+        or reply to your confirmation email.
+      </p>
+    </div>
+  <% } %>
+
   <%
-    const steps = ['pending_payment','payment_review','paid','in_progress','completed'];
+    const steps = ['awaiting_review','pending_payment','payment_review','paid','in_progress','completed'];
     const idx = steps.indexOf(order.status);
   %>
   <div class="timeline">

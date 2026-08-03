@@ -31,7 +31,68 @@ function send(args) {
  * HTML body for the pay-now email. Table layout and inline styles because
  * Gmail/Outlook strip <style> blocks and ignore most modern CSS.
  */
-function payHtml({ order, serviceFee, productDeposit, total, payUrl, qrHtml }) {
+/** HTML body for the "booking received, under review" email. */
+function reviewHtml({ order, indicative, hours }) {
+  return `<!doctype html><html><body style="margin:0;padding:24px 12px;background:#f8fafc">
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:14px">
+  <tr><td style="padding:26px 26px 0">
+    <p style="margin:0 0 4px;font:700 19px/1.3 system-ui,sans-serif;color:#0f172a">Hi ${esc(order.client_name)},</p>
+    <p style="margin:0;font:14px/1.6 system-ui,sans-serif;color:#475569">
+      Thanks — we've received your mystery shop request.
+    </p>
+  </td></tr>
+
+  <tr><td style="padding:18px 26px 0">
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%"
+           style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px">
+      <tr><td style="padding:6px 0;font:14px/1.5 system-ui,sans-serif;color:#475569">Order</td>
+          <td style="padding:6px 0;text-align:right;font:600 14px/1.5 system-ui,sans-serif;color:#0f172a">${esc(order.order_code)}</td></tr>
+      <tr><td style="padding:6px 0;font:14px/1.5 system-ui,sans-serif;color:#475569">Plan</td>
+          <td style="padding:6px 0;text-align:right;font:14px/1.5 system-ui,sans-serif;color:#0f172a">${esc(order.plan_name)}</td></tr>
+      <tr><td style="padding:6px 0;font:14px/1.5 system-ui,sans-serif;color:#475569">Store</td>
+          <td style="padding:6px 0;text-align:right;font:13px/1.5 system-ui,sans-serif;color:#0f172a;word-break:break-all">${esc(order.brand_url)}</td></tr>
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:18px 26px 0">
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%"
+           style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px">
+      <tr><td style="padding:16px 18px">
+        <p style="margin:0 0 8px;font:700 14px system-ui,sans-serif;color:#5b21b6">What happens next</p>
+        <p style="margin:0;font:14px/1.65 system-ui,sans-serif;color:#4c1d95">
+          Our team is reviewing your brief now — the product, the shipping location and
+          whether the item can be returned. We'll confirm the final figure and email you a
+          secure payment link <b>within ${esc(hours)} hours</b> (working days).
+        </p>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:16px 26px 0">
+    <p style="margin:0;font:14px/1.6 system-ui,sans-serif;color:#475569">
+      <b style="color:#0f172a">Nothing is payable yet</b>, and you're not committed to
+      anything until you pay.
+    </p>
+    <p style="margin:10px 0 0;font:13px/1.6 system-ui,sans-serif;color:#64748b">
+      Indicative total from what you entered: <b style="color:#0f172a">${esc(formatInr(indicative))}</b><br>
+      The confirmed amount may differ once we've checked the actual cart price.
+    </p>
+  </td></tr>
+
+  <tr><td style="padding:20px 26px 26px;text-align:center">
+    <a href="${esc(trackUrl(order))}"
+       style="display:inline-block;padding:11px 20px;border:1px solid #cbd5e1;color:#0f172a;border-radius:9px;
+              font:600 14px system-ui,sans-serif;text-decoration:none">Track your order</a>
+    <p style="margin:16px 0 0;font:12px/1.5 system-ui,sans-serif;color:#94a3b8">
+      Questions? Just reply to this email.<br>
+      IndiaOffers E-Mystery · a product of IndiaOffers.in
+    </p>
+  </td></tr>
+</table>
+</body></html>`;
+}
+
+function payHtml({ order, serviceFee, productDeposit, total, payUrl, qrHtml, reviewNote }) {
   const row = (label, value, bold) =>
     `<tr>` +
     `<td style="padding:7px 0;font:14px/1.5 system-ui,sans-serif;color:#475569">${esc(label)}</td>` +
@@ -43,8 +104,17 @@ function payHtml({ order, serviceFee, productDeposit, total, payUrl, qrHtml }) {
   <tr><td style="padding:26px 26px 0">
     <p style="margin:0 0 4px;font:700 19px/1.3 system-ui,sans-serif;color:#0f172a">Hi ${esc(order.client_name)},</p>
     <p style="margin:0;font:14px/1.6 system-ui,sans-serif;color:#475569">
-      Your mystery shop is booked. Pay below and we'll get started.
+      We've reviewed your brief — your mystery shop is ready to start. Pay below and
+      we'll get going.
     </p>
+    ${
+      reviewNote
+        ? `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px">
+      <tr><td style="padding:12px 14px;font:14px/1.6 system-ui,sans-serif;color:#334155">
+        <b style="color:#0f172a">Note from our team:</b> ${esc(reviewNote)}
+      </td></tr></table>`
+        : ''
+    }
   </td></tr>
 
   <tr><td style="padding:18px 26px 0">
@@ -144,13 +214,57 @@ async function paymentRejected(order, reason) {
 }
 
 /**
- * New booking, awaiting first payment.
+ * Booking received, going into human review.
+ *
+ * Deliberately quotes no amount. The figures shown on the booking form are
+ * derived from a client-typed cart estimate; committing to them before anyone
+ * has read the brief is how you end up under-collecting on Customized orders.
+ */
+async function bookingReceived(order, { serviceFee, productDeposit }) {
+  const hours = config.reviewSlaHours;
+  const indicative = serviceFee + productDeposit;
+
+  await send({
+    to: order.client_email,
+    subject: `Booking received — ${order.order_code} (we'll send your payment link within ${hours}h)`,
+    text:
+      `Hi ${order.client_name},\n\n` +
+      `Thanks — we've received your mystery shop request.\n\n` +
+      `Order: ${order.order_code}\nPlan: ${order.plan_name}\nStore: ${order.brand_url}\n\n` +
+      `WHAT HAPPENS NEXT\n` +
+      `Our team is reviewing your brief now — the product, the shipping location and\n` +
+      `whether the item can be returned. We'll confirm the final figure and email you\n` +
+      `a secure payment link within ${hours} hours (working days).\n\n` +
+      `Nothing is payable yet, and you're not committed to anything until you pay.\n\n` +
+      `Indicative total based on what you entered: ${formatInr(indicative)}\n` +
+      `(the confirmed amount may differ once we've checked the actual cart price)\n\n` +
+      `Track your order: ${trackUrl(order)}\n\n` +
+      `Questions? Reply to this email or WhatsApp us.\n\n— IndiaOffers E-Mystery`,
+    html: reviewHtml({ order, indicative, hours })
+  });
+
+  await send({
+    to: config.support.email,
+    subject: `[E-Mystery] REVIEW ${order.order_code} — ${order.plan_name} (~${formatInr(indicative)})`,
+    text:
+      `${order.client_name} <${order.client_email}>\n${order.brand_url}\n` +
+      `Plan: ${order.plan_name}\n` +
+      `Indicative: service ${formatInr(serviceFee)} + deposit ${formatInr(productDeposit)} = ${formatInr(indicative)}\n` +
+      `(deposit derived from the client's own cart estimate — verify it)\n\n` +
+      `ACTION: review the brief, set the real figures, send the payment link.\n` +
+      `${config.siteUrl}/admin/orders/${order.id}\n\n` +
+      `SLA: ${hours}h`
+  });
+}
+
+/**
+ * Review done — here is the quote and the pay link.
  *
  * Includes a UPI QR for the exact amount. Scanning it prefills payee and
  * amount, so the client can't mistype either — which in turn means far fewer
  * payment claims that don't reconcile against the statement.
  */
-async function orderCreated(order, { serviceFee, productDeposit }) {
+async function orderCreated(order, { serviceFee, productDeposit, reviewNote }) {
   const total = serviceFee + productDeposit;
   const payUrl = `${config.siteUrl}/pay/${order.order_code}?t=${order.access_token}`;
 
@@ -187,18 +301,20 @@ async function orderCreated(order, { serviceFee, productDeposit }) {
 
   await send({
     to: order.client_email,
-    subject: `Order ${order.order_code} — pay to start your IndiaOffers mystery shop`,
+    subject: `Payment link for ${order.order_code} — ${formatInr(total)}`,
     text:
       `Hi ${order.client_name},\n\n` +
+      `We've reviewed your brief and your mystery shop is ready to start.\n\n` +
       `Order ${order.order_code} (${order.plan_name})\n` +
       `Service fee: ${formatInr(serviceFee)}\n` +
       `Product deposit: ${formatInr(productDeposit)}\n` +
       `Total due: ${formatInr(total)}\n` +
+      (reviewNote ? `\nNote from our team: ${reviewNote}\n` : '') +
       qrText +
       `\nPay online: ${payUrl}\n\n` +
       `After paying, enter your UTR / reference on that page so we can verify it.\n\n` +
       `— IndiaOffers E-Mystery`,
-    html: payHtml({ order, serviceFee, productDeposit, total, payUrl, qrHtml }),
+    html: payHtml({ order, serviceFee, productDeposit, total, payUrl, qrHtml, reviewNote }),
     attachments
   });
   await send({
@@ -223,6 +339,7 @@ async function reportPublished(order, report) {
 }
 
 module.exports = {
+  bookingReceived,
   orderCreated,
   paymentClaimed,
   paymentConfirmed,

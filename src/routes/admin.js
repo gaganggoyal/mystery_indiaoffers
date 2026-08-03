@@ -107,6 +107,7 @@ router.get('/orders/:id', async (req, res, next) => {
       published: req.query.published === '1',
       confirmed: req.query.confirmed === '1',
       rejected: req.query.rejected === '1',
+      linksent: req.query.linksent === '1',
       err: req.query.err || null
     });
   } catch (err) { next(err); }
@@ -118,6 +119,43 @@ router.post('/orders/:id', async (req, res, next) => {
     if (!rows.length) return res.redirect('/admin/orders');
     const order = rows[0];
     const action = req.body.action || 'save_order';
+
+    // Review checkpoint: confirm scope, correct the figures the client's own
+    // cart estimate produced, then release the payment link. This is the only
+    // place the quoted amounts can change, and only before anything is owed.
+    if (action === 'send_payment_link') {
+      if (order.status !== 'awaiting_review') return res.redirect(`/admin/orders/${order.id}`);
+
+      const fee = parseInt(req.body.service_fee, 10);
+      const deposit = parseInt(req.body.product_deposit, 10);
+      const note = String(req.body.review_note || '').trim().slice(0, 500);
+
+      const serviceFee = Number.isNaN(fee) ? order.price_inr : Math.max(0, fee);
+      const productDeposit = Number.isNaN(deposit) ? (order.product_deposit_inr || 0) : Math.max(0, deposit);
+
+      const changed =
+        serviceFee !== order.price_inr || productDeposit !== (order.product_deposit_inr || 0);
+
+      await db.query(
+        `UPDATE mystery_orders SET status='pending_payment', price_inr=?, product_deposit_inr=?,
+           admin_notes=TRIM(COALESCE(admin_notes,'') || ?), updated_at=? WHERE id=?`,
+        [
+          serviceFee,
+          productDeposit,
+          `\n[${db.nowSql()}] Reviewed by ${req.admin.email}; payment link sent` +
+            (changed
+              ? ` (amounts adjusted: service ${order.price_inr}→${serviceFee}, deposit ${order.product_deposit_inr || 0}→${productDeposit})`
+              : '') +
+            (note ? `. Note to client: ${note}` : ''),
+          db.nowSql(),
+          order.id
+        ]
+      );
+
+      const fresh = (await db.query('SELECT * FROM mystery_orders WHERE id = ?', [order.id]))[0];
+      await notify.orderCreated(fresh, { serviceFee, productDeposit, reviewNote: note });
+      return res.redirect(`/admin/orders/${order.id}?linksent=1`);
+    }
 
     // Money confirmation is deliberately its own action, not a status dropdown
     // change: it is the point where we accept that cash actually arrived and

@@ -2,6 +2,7 @@
 
 <% if (saved) { %><div class="form-ok">Saved.</div><% } %>
 <% if (published) { %><div class="form-ok">Report published &amp; client emailed.</div><% } %>
+<% if (linksent) { %><div class="form-ok">Payment link emailed to the client. Order moved to “Awaiting payment”.</div><% } %>
 <% if (confirmed) { %><div class="form-ok">Payment confirmed. Client emailed &amp; order queued for shopping.</div><% } %>
 <% if (rejected) { %><div class="form-ok">Payment claim rejected. Client emailed and order returned to “awaiting payment”.</div><% } %>
 <% if (err === 'confirm_payment') { %>
@@ -50,6 +51,46 @@
     </p>
   </div>
 </div>
+
+<% if (order.status === 'awaiting_review') { %>
+  <%
+    const indicativeTotal = (order.price_inr || 0) + (order.product_deposit_inr || 0);
+  %>
+  <div class="card" style="margin-bottom:18px;border-color:#8b5cf6">
+    <h3>◆ Review this brief, then send the payment link</h3>
+    <p class="muted" style="margin-top:6px;font-size:13.5px">
+      The product deposit below was calculated from the cart estimate <b>the client typed
+      in</b><% if (order.product_deposit_inr) { %> — check it against the real product page before
+      sending<% } %>. On the Customized plan the client funds 100% of the product, so an
+      under-estimate here is money you don't collect. Nothing has been quoted to them yet.
+    </p>
+
+    <form method="post" action="/admin/orders/<%= order.id %>" id="send_link_form" style="margin-top:12px">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="action" value="send_payment_link">
+      <div class="two">
+        <label>Service fee (₹)
+          <input type="number" name="service_fee" min="0" step="1" value="<%= order.price_inr || 0 %>">
+        </label>
+        <label>Product deposit (₹)
+          <input type="number" name="product_deposit" min="0" step="1" value="<%= order.product_deposit_inr || 0 %>">
+        </label>
+      </div>
+      <label>Note to the client (optional — appears in the email)
+        <input name="review_note" maxlength="500"
+               placeholder="e.g. Cart came to ₹2,340 so the deposit is adjusted accordingly">
+      </label>
+      <button class="btn-primary" type="submit" style="margin-top:12px">
+        ✉ Send payment link — currently <%= formatInr(indicativeTotal) %>
+      </button>
+      <p class="muted" style="margin-top:8px;font-size:12.5px">
+        <%# admin renders don't receive the public `payment` local — read it off config. %>
+        Emails the client a pay link<%= config.payment.upiId && config.payment.upiId !== 'indiaoffers@upi' ? ' with a prefilled UPI QR' : '' %>
+        and moves the order to “Awaiting payment”.
+      </p>
+    </form>
+  </div>
+<% } %>
 
 <% if (order.status === 'payment_review' || order.status === 'pending_payment') { %>
   <%
@@ -198,6 +239,19 @@
       }
     });
   }
+  // Sending the link commits us to a quoted figure — confirm the numbers first.
+  var sendLink = document.getElementById('send_link_form');
+  if (sendLink) {
+    sendLink.addEventListener('submit', function (e) {
+      var fee = Number(sendLink.service_fee.value || 0);
+      var dep = Number(sendLink.product_deposit.value || 0);
+      var total = (fee + dep).toLocaleString('en-IN');
+      if (!confirm('Email the client a payment link for ₹' + total + '?\n\nThis is the amount they will be asked to pay.')) {
+        e.preventDefault();
+      }
+    });
+  }
+
   var rejectPay = document.getElementById('reject_payment_form');
   if (rejectPay) {
     rejectPay.addEventListener('submit', function (e) {
